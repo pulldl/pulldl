@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "PullDL - Fast Video & Audio Downloader",
+  "version": "1.0.0",
+  "description": "Download videos and audio from YouTube, TikTok, Facebook, Instagram, Twitter/X, and 1,000+ sites with 1 click using PullDL.",
+  "permissions": [
+    "activeTab",
+    "contextMenus"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PullDL Downloader"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.tiktok.com/*",
+        "*://*.instagram.com/*",
+        "*://*.facebook.com/*",
+        "*://*.twitter.com/*",
+        "*://*.x.com/*",
+        "*://*.reddit.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

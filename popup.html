@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PullDL - Video & Audio Downloader</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      width: 340px;
+      padding: 16px;
+      background: #0f172a;
+      color: #f8fafc;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      font-weight: 600;
+    }
+    .current-card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #334155;
+    }
+    .current-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    .current-url {
+      font-size: 11px;
+      color: #cbd5e1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 8px;
+    }
+    .btn-primary {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-primary:hover {
+      opacity: 0.95;
+    }
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+    .input-section {
+      margin-top: 10px;
+    }
+    .input-box {
+      width: 100%;
+      padding: 8px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 12px;
+      outline: none;
+      margin-bottom: 8px;
+    }
+    .input-box:focus {
+      border-color: #38bdf8;
+    }
+    .footer {
+      margin-top: 12px;
+      font-size: 10px;
+      color: #64748b;
+      text-align: center;
+    }
+    .footer a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <span>⚡ PullDL</span>
+    </div>
+    <span class="badge">v1.0</span>
+  </div>
+
+  <div class="current-card">
+    <div class="current-title">Current Tab:</div>
+    <div class="current-url" id="currentUrl">Detecting media...</div>
+    <button class="btn-primary" id="btnDownloadCurrent">
+      <span>⚡ Download This Video</span>
+    </button>
+  </div>
+
+  <div class="input-section">
+    <input type="text" class="input-box" id="customUrl" placeholder="Or paste any video/audio URL...">
+    <button class="btn-primary" id="btnDownloadCustom" style="background: #334155;">
+      <span>Analyze URL</span>
+    </button>
+  </div>
+
+  <div class="footer">
+    Supports YouTube, TikTok, Instagram, Facebook, X & 1,000+ sites • <a href="https://pulldl.com" target="_blank">pulldl.com</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
