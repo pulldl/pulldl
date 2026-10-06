@@ -29,6 +29,26 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
   }
 
+  // Gracefully re-inject content scripts into already open tabs
+  if (chrome.scripting) {
+    chrome.tabs.query({ url: ["http://*/*", "https://*/*"] }, (tabs) => {
+      if (tabs && tabs.length > 0) {
+        tabs.forEach((tab) => {
+          if (tab.id && !tab.url.startsWith("chrome://") && !tab.url.startsWith("chrome-extension://")) {
+            chrome.scripting.executeScript({
+              target: { tabId: tab.id, allFrames: false },
+              files: ["content.js"]
+            }).catch(() => {});
+            chrome.scripting.insertCSS({
+              target: { tabId: tab.id },
+              files: ["content.css"]
+            }).catch(() => {});
+          }
+        });
+      }
+    });
+  }
+
   // Organized Context Menus
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
@@ -95,29 +115,40 @@ function sanitizeFilename(name, fallbackExt = "mp4") {
 
 // 2. Layer 5: Cloud API Stream Resolver
 async function resolveMediaFormatsViaApi(pageUrl) {
-  try {
-    const response = await fetch("https://pulldl.com/api/extract", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "PullDL-Universal-Extension/3.0.0"
-      },
-      body: JSON.stringify({ url: pageUrl })
-    });
+  const endpoints = [
+    "https://pulldl.com/api/extract",
+    "https://api.pulldl.com/api/extract"
+  ];
 
-    if (!response.ok) {
-      throw new Error(`Extraction service returned HTTP ${response.status}`);
-    }
+  let lastError = null;
 
-    const json = await response.json();
-    if (json.success && json.data) {
-      return json.data;
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+          // DO NOT include User-Agent here: forbidden header in browser fetch
+        },
+        body: JSON.stringify({ url: pageUrl })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Extraction service returned HTTP ${response.status}`);
+      }
+
+      const json = await response.json();
+      if (json && json.success && json.data) {
+        return json.data;
+      }
+      throw new Error(json?.detail || "Unable to extract stream metadata.");
+    } catch (err) {
+      lastError = err;
+      console.warn(`PullDL API endpoint (${endpoint}) failed:`, err.message);
     }
-    throw new Error(json.detail || "Unable to extract stream metadata.");
-  } catch (err) {
-    console.error("PullDL API Resolver Error:", err);
-    throw err;
   }
+
+  throw lastError || new Error("Unable to extract stream metadata.");
 }
 
 // 3. Layer 4: WebRequest Stream Sniffer
@@ -131,39 +162,45 @@ const MEDIA_URL_REGEX = /\.(mp4|webm|mkv|m4v|mov|m3u8|mpd|mp3|aac|flac|wav|m4a)(
 
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
-    if (details.tabId < 0) return;
-    const url = details.url;
+    try {
+      if (!details || details.tabId < 0) return;
+      const url = details.url;
+      if (!url) return;
 
-    if (url.includes("google-analytics.com") || url.includes("doubleclick.net") || url.includes("/telemetry/")) return;
+      if (url.includes("google-analytics.com") || url.includes("doubleclick.net") || url.includes("/telemetry/")) return;
 
-    let mimeType = "";
-    let contentLength = 0;
+      let mimeType = "";
+      let contentLength = 0;
 
-    if (details.responseHeaders) {
-      for (const header of details.responseHeaders) {
-        const name = header.name.toLowerCase();
-        if (name === "content-type") {
-          mimeType = header.value.toLowerCase().split(";")[0].trim();
-        } else if (name === "content-length") {
-          contentLength = parseInt(header.value, 10) || 0;
+      if (details.responseHeaders && Array.isArray(details.responseHeaders)) {
+        for (const header of details.responseHeaders) {
+          if (!header || !header.name) continue;
+          const name = String(header.name).toLowerCase();
+          if (name === "content-type" && header.value) {
+            mimeType = String(header.value).toLowerCase().split(";")[0].trim();
+          } else if (name === "content-length" && header.value) {
+            contentLength = parseInt(header.value, 10) || 0;
+          }
         }
       }
-    }
 
-    const isMediaMime = MEDIA_MIME_TYPES.some((type) => mimeType.includes(type));
-    const isMediaUrl = MEDIA_URL_REGEX.test(url);
-    const isManifest = url.includes(".m3u8") || url.includes(".mpd") || mimeType.includes("mpegurl");
+      const isMediaMime = MEDIA_MIME_TYPES.some((type) => mimeType.includes(type));
+      const isMediaUrl = MEDIA_URL_REGEX.test(url);
+      const isManifest = url.includes(".m3u8") || url.includes(".mpd") || mimeType.includes("mpegurl");
 
-    if (!isManifest && contentLength > 0 && contentLength < 120 * 1024) return;
+      if (!isManifest && contentLength > 0 && contentLength < 120 * 1024) return;
 
-    if (isMediaMime || isMediaUrl) {
-      registerDetectedMedia(details.tabId, {
-        url: url,
-        mimeType: mimeType || "video/mp4",
-        size: contentLength,
-        isStream: isManifest,
-        detectedAt: Date.now()
-      });
+      if (isMediaMime || isMediaUrl) {
+        registerDetectedMedia(details.tabId, {
+          url: url,
+          mimeType: mimeType || "video/mp4",
+          size: contentLength,
+          isStream: isManifest,
+          detectedAt: Date.now()
+        });
+      }
+    } catch (err) {
+      // Gracefully ignore header inspection errors
     }
   },
   { urls: ["<all_urls>"] },

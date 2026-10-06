@@ -53,6 +53,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: "RESOLVE_PLATFORM_FORMATS",
         pageUrl: activeTab.url
       }, (resp) => {
+        if (chrome.runtime.lastError) return;
         if (resp?.success && resp.data?.formats?.length > 0) {
           detectedMediaItems = resp.data.formats;
           const best = detectedMediaItems[0];
@@ -61,6 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     } else {
       chrome.runtime.sendMessage({ type: "GET_TAB_MEDIA", tabId: activeTab.id }, (response) => {
+        if (chrome.runtime.lastError) return;
         const media = response?.media || [];
         detectedMediaItems = media;
         if (media.length > 0) {
@@ -94,6 +96,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       type: "OPEN_SIDE_PANEL",
       windowId: currentWindow?.id
     }, () => {
+      if (chrome.runtime.lastError) {}
       window.close();
     });
   }
@@ -147,7 +150,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 6. Recent Activity Loader
   chrome.runtime.sendMessage({ type: "GET_ACTIVE_DOWNLOADS" }, (res) => {
-    if (!res) return;
+    if (chrome.runtime.lastError || !res) return;
     const items = [...(res.activeDownloads || []), ...(res.history || [])].slice(0, 2);
 
     if (items.length > 0) {

@@ -2,19 +2,120 @@
 // 7-Layer Detection Engine: DOM (L1), Page Runtime Bridge (L2), Resource Timing (L3), Confidence Scoring (L6)
 
 (function () {
-  if (window.__pulldl_universal_injected) return;
-  window.__pulldl_universal_injected = true;
+  // If an older orphaned instance was running from previous reload, clean it up
+  if (window.__pulldl_cleanup) {
+    try { window.__pulldl_cleanup(); } catch (e) {}
+  }
+  const currentInstanceId = Date.now();
+  window.__pulldl_instance_id = currentInstanceId;
 
-  // 1. Inject Layer 2 Safe Page-Context Runtime Bridge
+  // 1. Safe Extension Communication & Context Validation
+  function isExtensionValid() {
+    try {
+      return typeof chrome !== "undefined" && Boolean(chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function safeSendMessage(message, callback) {
+    if (!isExtensionValid()) {
+      if (callback) callback({ success: false, error: "Extension context invalidated" });
+      return false;
+    }
+    try {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (!isExtensionValid()) return;
+        const lastErr = chrome.runtime.lastError;
+        if (lastErr) {
+          if (callback) callback({ success: false, error: lastErr.message });
+          return;
+        }
+        if (callback) callback(response);
+      });
+      return true;
+    } catch (err) {
+      if (callback) callback({ success: false, error: err.message });
+      return false;
+    }
+  }
+
+  // Resilient Dual-Layer Format Resolver (Background Service Worker + Direct Webpage Fallback)
+  async function resolvePlatformFormatsResiliently(pageUrl) {
+    // Attempt 1: Via Background Service Worker
+    if (isExtensionValid()) {
+      const bgPromise = new Promise((resolve) => {
+        let done = false;
+        const timer = setTimeout(() => {
+          if (!done) { done = true; resolve(null); }
+        }, 3500);
+
+        const sent = safeSendMessage({
+          type: "RESOLVE_PLATFORM_FORMATS",
+          pageUrl: pageUrl
+        }, (resp) => {
+          if (!done) {
+            done = true;
+            clearTimeout(timer);
+            if (resp && resp.success && resp.data) {
+              resolve(resp.data);
+            } else {
+              resolve(null);
+            }
+          }
+        });
+
+        if (!sent && !done) {
+          done = true;
+          clearTimeout(timer);
+          resolve(null);
+        }
+      });
+
+      const bgData = await bgPromise;
+      if (bgData && bgData.formats && bgData.formats.length > 0) {
+        return bgData;
+      }
+    }
+
+    // Attempt 2: Direct Fallback to Extraction API from Page
+    try {
+      const endpoints = [
+        "https://pulldl.com/api/extract",
+        "https://api.pulldl.com/api/extract"
+      ];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: pageUrl })
+          });
+          if (res.ok) {
+            const json = await res.json();
+            if (json && json.success && json.data && json.data.formats?.length > 0) {
+              return json.data;
+            }
+          }
+        } catch (e) {}
+      }
+    } catch (err) {}
+
+    return null;
+  }
+
+  // 2. Inject Layer 2 Safe Page-Context Runtime Bridge
   try {
-    const bridgeScript = document.createElement("script");
-    bridgeScript.src = chrome.runtime.getURL("page_bridge.js");
-    bridgeScript.async = false;
-    (document.head || document.documentElement).appendChild(bridgeScript);
-    bridgeScript.onload = () => bridgeScript.remove();
+    if (isExtensionValid()) {
+      const bridgeScript = document.createElement("script");
+      bridgeScript.src = chrome.runtime.getURL("page_bridge.js");
+      bridgeScript.async = false;
+      (document.head || document.documentElement).appendChild(bridgeScript);
+      bridgeScript.onload = () => bridgeScript.remove();
+    }
   } catch (e) {}
 
-  const detectedCandidates = new Map(); // url -> candidate info
+  const detectedCandidates = new Map();
   const processedVideos = new WeakSet();
 
   function formatBytes(bytes) {
@@ -72,17 +173,13 @@
     return "Web Media";
   }
 
-  // 2. Layer 6: Confidence Scoring & Candidate Ranking
   function calculateConfidence(candidate) {
     let score = 0.5;
     const url = (candidate.url || "").toLowerCase();
-
     if (url.includes(".m3u8") || url.includes(".mpd")) score += 0.45;
     if (url.includes(".mp4") || url.includes(".webm")) score += 0.4;
     if (candidate.width && candidate.width >= 720) score += 0.2;
     if (candidate.duration && candidate.duration > 15) score += 0.15;
-
-    // Filter out ads / trackers
     if (url.includes("analytics") || url.includes("doubleclick") || url.includes("telemetry") || url.includes("beacon")) {
       score = 0.05;
     }
@@ -91,15 +188,15 @@
 
   function addCandidate(candidate) {
     if (!candidate.url || candidate.url.startsWith("blob:") || candidate.url.startsWith("data:")) return;
+    if (!isExtensionValid()) return;
 
     const confidence = calculateConfidence(candidate);
-    if (confidence < 0.6) return; // Drop low-confidence noise
+    if (confidence < 0.6) return;
 
     candidate.confidence = confidence;
     detectedCandidates.set(candidate.url, candidate);
 
-    // Notify background
-    chrome.runtime.sendMessage({
+    safeSendMessage({
       type: "DOM_MEDIA_FOUND",
       media: {
         url: candidate.url,
@@ -108,11 +205,11 @@
         size: candidate.size || 0,
         confidence: confidence
       }
-    }).catch(() => {});
+    });
   }
 
   // 3. Layer 2: Listen for Page Runtime Bridge Messages
-  window.addEventListener("message", (event) => {
+  const bridgeMsgListener = (event) => {
     if (event.data?.source !== "PULLDL_PAGE_BRIDGE") return;
 
     const { type, data } = event.data;
@@ -130,7 +227,8 @@
         format: data.url.includes(".m3u8") ? "HLS" : data.url.includes(".mpd") ? "DASH" : "Stream"
       });
     }
-  });
+  };
+  window.addEventListener("message", bridgeMsgListener);
 
   // 4. Layer 3: Resource Performance Sniffer
   function scanPerformanceResources() {
@@ -148,7 +246,7 @@
       });
     } catch (e) {}
   }
-  setInterval(scanPerformanceResources, 3500);
+  const perfInterval = setInterval(scanPerformanceResources, 3500);
 
   // 5. Layer 1: DOM Media Detection & SPA Route Listening
   function scanAndAttachVideoButtons() {
@@ -257,17 +355,11 @@
         if (!cachedFormats && !isFetching) {
           isFetching = true;
           try {
-            const resp = await new Promise((resolve) => {
-              chrome.runtime.sendMessage({
-                type: "RESOLVE_PLATFORM_FORMATS",
-                pageUrl: window.location.href
-              }, resolve);
-            });
-
+            const data = await resolvePlatformFormatsResiliently(window.location.href);
             isFetching = false;
-            if (resp && resp.success && resp.data && resp.data.formats && resp.data.formats.length > 0) {
-              cachedFormats = resp.data;
-              renderApiFormats(resp.data);
+            if (data && data.formats && data.formats.length > 0) {
+              cachedFormats = data;
+              renderApiFormats(data);
             } else {
               renderFallbackFormats();
             }
@@ -433,22 +525,26 @@
     }
 
     // Smart Download primary button
-    pill.querySelector(".pulldl-pill-btn-dl")?.addEventListener("click", (e) => {
+    pill.querySelector(".pulldl-pill-btn-dl")?.addEventListener("click", async (e) => {
       e.stopPropagation();
       e.preventDefault();
       const directUrl = video.currentSrc || video.src;
       const title = getCleanPageTitle();
 
       if (isPlatformSite() || (!directUrl || directUrl.startsWith("blob:"))) {
-        chrome.runtime.sendMessage({
-          type: "RESOLVE_PLATFORM_FORMATS",
-          pageUrl: window.location.href
-        }, (resp) => {
-          if (resp?.success && resp.data?.formats?.length > 0) {
-            const best = resp.data.formats[0];
+        const dlBtn = pill.querySelector(".pulldl-pill-btn-dl");
+        const origText = dlBtn ? dlBtn.textContent : "Download";
+        if (dlBtn) dlBtn.textContent = "Resolving...";
+
+        try {
+          const data = await resolvePlatformFormatsResiliently(window.location.href);
+          if (dlBtn) dlBtn.textContent = origText;
+
+          if (data && data.formats && data.formats.length > 0) {
+            const best = data.formats[0];
             showDownloadInfoModal({
               url: best.url,
-              title: resp.data.title || title,
+              title: data.title || title,
               ext: best.ext || "mp4",
               category: best.ext === "mp3" ? "audio" : "video",
               filesize: best.filesize || best.size || 0,
@@ -457,7 +553,10 @@
           } else {
             window.open(`https://pulldl.com/?url=${encodeURIComponent(window.location.href)}`, "_blank");
           }
-        });
+        } catch (err) {
+          if (dlBtn) dlBtn.textContent = origText;
+          window.open(`https://pulldl.com/?url=${encodeURIComponent(window.location.href)}`, "_blank");
+        }
       } else {
         showDownloadInfoModal({
           url: directUrl,
@@ -657,7 +756,7 @@
       closeDialog();
 
       // Trigger high-speed download through background service worker
-      chrome.runtime.sendMessage({
+      const downloadPayload = {
         type: "TRIGGER_DOWNLOAD",
         url: mediaData.url,
         title: editedName,
@@ -666,7 +765,17 @@
         category: selectedCat,
         ext: selectedExt,
         saveAs: saveAs
+      };
+
+      const sent = safeSendMessage(downloadPayload, (resp) => {
+        if (!resp || !resp.success) {
+          fallbackDirectDownload(mediaData.url, editedName);
+        }
       });
+
+      if (!sent) {
+        fallbackDirectDownload(mediaData.url, editedName);
+      }
 
       // Show Step 2: Live Download Status Window immediately
       showDownloadStatusWindow({
@@ -683,6 +792,24 @@
         url: mediaData.url
       });
     });
+  }
+
+  function fallbackDirectDownload(url, filename) {
+    if (!url) return;
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename || "download.mp4";
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try { a.remove(); } catch (e) {}
+      }, 1000);
+    } catch (e) {
+      window.open(url, "_blank");
+    }
   }
 
   // Step 2: IDM-Grade Download Status Window
@@ -828,10 +955,10 @@
 
     if (isComplete) {
       win.querySelector("#pulldl-btn-act-open")?.addEventListener("click", () => {
-        chrome.runtime.sendMessage({ type: "OPEN_DOWNLOAD", downloadId: data.downloadId });
+        safeSendMessage({ type: "OPEN_DOWNLOAD", downloadId: data.downloadId });
       });
       win.querySelector("#pulldl-btn-act-folder")?.addEventListener("click", () => {
-        chrome.runtime.sendMessage({ type: "SHOW_IN_FOLDER", downloadId: data.downloadId });
+        safeSendMessage({ type: "SHOW_IN_FOLDER", downloadId: data.downloadId });
       });
       win.querySelector("#pulldl-btn-act-done")?.addEventListener("click", () => {
         win.remove();
@@ -840,13 +967,13 @@
     } else {
       win.querySelector("#pulldl-btn-act-pause")?.addEventListener("click", () => {
         if (isPaused) {
-          chrome.runtime.sendMessage({ type: "RESUME_DOWNLOAD", downloadId: data.downloadId });
+          safeSendMessage({ type: "RESUME_DOWNLOAD", downloadId: data.downloadId });
         } else {
-          chrome.runtime.sendMessage({ type: "PAUSE_DOWNLOAD", downloadId: data.downloadId });
+          safeSendMessage({ type: "PAUSE_DOWNLOAD", downloadId: data.downloadId });
         }
       });
       win.querySelector("#pulldl-btn-act-cancel")?.addEventListener("click", () => {
-        chrome.runtime.sendMessage({ type: "CANCEL_DOWNLOAD", downloadId: data.downloadId });
+        safeSendMessage({ type: "CANCEL_DOWNLOAD", downloadId: data.downloadId });
         win.remove();
         activeStatusWindow = null;
       });
@@ -942,36 +1069,43 @@
   }
 
   // 8. Telemetry & Action Messages
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === "SCRAPE_PAGE_LINKS" || message.type === "TRIGGER_PAGE_LINKGRAB") {
-      const links = scrapeAllPageLinks();
-      sendResponse({ success: true, links: links });
-      return true;
-    } else if (message.type === "DOWNLOAD_STARTED") {
-      showDownloadStatusWindow({
-        downloadId: message.data?.downloadId || message.downloadId,
-        title: message.data?.title || message.title,
-        speed: 0,
-        progress: 1,
-        receivedBytes: 0,
-        totalBytes: message.data?.totalBytes || message.totalBytes || 0,
-        eta: 0,
-        state: "in_progress"
+  if (isExtensionValid()) {
+    try {
+      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (!isExtensionValid()) return false;
+        if (message.type === "SCRAPE_PAGE_LINKS" || message.type === "TRIGGER_PAGE_LINKGRAB") {
+          const links = scrapeAllPageLinks();
+          sendResponse({ success: true, links: links });
+          return true;
+        } else if (message.type === "DOWNLOAD_STARTED") {
+          showDownloadStatusWindow({
+            downloadId: message.data?.downloadId || message.downloadId,
+            title: message.data?.title || message.title,
+            speed: 0,
+            progress: 1,
+            receivedBytes: 0,
+            totalBytes: message.data?.totalBytes || message.totalBytes || 0,
+            eta: 0,
+            state: "in_progress"
+          });
+        } else if (message.type === "DOWNLOAD_PROGRESS") {
+          showDownloadStatusWindow(message.data);
+        } else if (message.type === "DOWNLOAD_COMPLETE") {
+          showDownloadStatusWindow({ ...message.data, progress: 100, state: "complete" });
+        }
       });
-    } else if (message.type === "DOWNLOAD_PROGRESS") {
-      showDownloadStatusWindow(message.data);
-    } else if (message.type === "DOWNLOAD_COMPLETE") {
-      showDownloadStatusWindow({ ...message.data, progress: 100, state: "complete" });
-    }
-  });
+    } catch (e) {}
+  }
 
-  // 8. MutationObserver & SPA Navigation Support
+  // 9. MutationObserver & SPA Navigation Support
   const observer = new MutationObserver(() => scanAndAttachVideoButtons());
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   // Listen to SPA route transitions (YouTube, TikTok, Facebook)
-  window.addEventListener("popstate", () => setTimeout(scanAndAttachVideoButtons, 600));
-  window.addEventListener("yt-navigate-finish", () => setTimeout(scanAndAttachVideoButtons, 600));
+  const popstateListener = () => setTimeout(scanAndAttachVideoButtons, 600);
+  const ytListener = () => setTimeout(scanAndAttachVideoButtons, 600);
+  window.addEventListener("popstate", popstateListener);
+  window.addEventListener("yt-navigate-finish", ytListener);
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", scanAndAttachVideoButtons);
@@ -979,7 +1113,19 @@
     scanAndAttachVideoButtons();
   }
 
-  // 9. Two-Way Handshake with PullDL Website
+  // 10. Two-Way Handshake with PullDL Website
+  const webMsgListener = (event) => {
+    if (event.data?.source === "PULLDL_WEB" && event.data?.type === "WEB_DOWNLOAD_TRIGGER") {
+      safeSendMessage({
+        type: "TRIGGER_DOWNLOAD",
+        url: event.data.url,
+        title: event.data.title,
+        ext: event.data.ext || "mp4",
+        category: event.data.category || "video"
+      });
+    }
+  };
+
   if (window.location.hostname.includes("pulldl.com") || window.location.hostname === "localhost") {
     try {
       document.documentElement.setAttribute("data-pulldl-extension-installed", "true");
@@ -988,17 +1134,17 @@
       window.postMessage({ source: "PULLDL_EXTENSION", type: "EXTENSION_READY", version: "3.0.0" }, "*");
     } catch (e) {}
 
-    // Listen for Web Studio download triggers
-    window.addEventListener("message", (event) => {
-      if (event.data?.source === "PULLDL_WEB" && event.data?.type === "WEB_DOWNLOAD_TRIGGER") {
-        chrome.runtime.sendMessage({
-          type: "TRIGGER_DOWNLOAD",
-          url: event.data.url,
-          title: event.data.title,
-          ext: event.data.ext || "mp4",
-          category: event.data.category || "video"
-        });
-      }
-    });
+    window.addEventListener("message", webMsgListener);
   }
+
+  // Global cleanup hook for hot-reloads / re-injections
+  window.__pulldl_cleanup = () => {
+    try { observer.disconnect(); } catch (e) {}
+    try { clearInterval(perfInterval); } catch (e) {}
+    try { window.removeEventListener("message", bridgeMsgListener); } catch (e) {}
+    try { window.removeEventListener("message", webMsgListener); } catch (e) {}
+    try { window.removeEventListener("popstate", popstateListener); } catch (e) {}
+    try { window.removeEventListener("yt-navigate-finish", ytListener); } catch (e) {}
+    document.querySelectorAll(".pulldl-corner-btn-container, .pulldl-modal-backdrop, .pulldl-fileinfo-dialog, #pulldl-active-status-window, .pulldl-minimized-pill").forEach(el => el.remove());
+  };
 })();

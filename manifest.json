@@ -10,7 +10,8 @@
     "webRequest",
     "contextMenus",
     "tabs",
-    "sidePanel"
+    "sidePanel",
+    "scripting"
   ],
   "side_panel": {
     "default_path": "sidepanel.html"

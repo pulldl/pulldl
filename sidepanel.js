@@ -125,6 +125,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: "RESOLVE_PLATFORM_FORMATS",
         pageUrl: activeTab.url
       }, (resp) => {
+        if (chrome.runtime.lastError) {
+          loadSniffedTabMedia();
+          return;
+        }
         if (resp?.success && resp.data && resp.data.formats?.length > 0) {
           headerSourceDot.className = "source-dot active";
           currentPlatformData = resp.data;
@@ -153,6 +157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function loadSniffedTabMedia() {
     chrome.runtime.sendMessage({ type: "GET_TAB_MEDIA", tabId: activeTab.id }, (response) => {
+      if (chrome.runtime.lastError) return;
       const media = response?.media || [];
       currentDetectedMedia = media;
       if (media.length > 0) {
