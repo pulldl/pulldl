@@ -200,8 +200,153 @@ function registerDetectedMedia(tabId, mediaItem) {
 
 chrome.tabs.onRemoved.addListener((tabId) => tabMediaMap.delete(tabId));
 
-// 4. Initiate High-Speed Download
-async function initiateDownload({ url, title, tabId, category = "video", ext = "mp4", saveAs = false }) {
+// 4. Initiate High-Speed Download (IDM-Grade Multi-Surface Engine)
+let telemetryInterval = null;
+
+function broadcastTelemetry(type, data) {
+  // 1. Send to extension views (side panel, popup)
+  chrome.runtime.sendMessage({ type, data }).catch(() => {});
+
+  // 2. Broadcast to all active tabs (for the in-page IDM status window)
+  chrome.tabs.query({}, (tabs) => {
+    if (tabs && tabs.length > 0) {
+      tabs.forEach((t) => {
+        if (t.id) {
+          chrome.tabs.sendMessage(t.id, { type, data }).catch(() => {});
+        }
+      });
+    }
+  });
+}
+
+function startTelemetryLoop() {
+  if (telemetryInterval) return;
+  telemetryInterval = setInterval(pollActiveDownloads, 350);
+}
+
+function stopTelemetryLoopIfEmpty() {
+  let hasActive = false;
+  for (const d of activeDownloadsMap.values()) {
+    if (d.state === "in_progress") {
+      hasActive = true;
+      break;
+    }
+  }
+  if (!hasActive && telemetryInterval) {
+    clearInterval(telemetryInterval);
+    telemetryInterval = null;
+  }
+}
+
+async function pollActiveDownloads() {
+  if (activeDownloadsMap.size === 0) {
+    stopTelemetryLoopIfEmpty();
+    return;
+  }
+
+  const now = Date.now();
+  let currentTotalSpeed = 0;
+
+  for (const [id, item] of activeDownloadsMap.entries()) {
+    if (item.state !== "in_progress") continue;
+
+    try {
+      const items = await chrome.downloads.search({ id });
+      if (!items || items.length === 0) continue;
+      const dl = items[0];
+
+      const received = dl.bytesReceived || 0;
+      const timeDiff = Math.max(0.1, (now - item.lastTime) / 1000);
+
+      if (timeDiff >= 0.25) {
+        const bytesDiff = Math.max(0, received - item.lastBytes);
+        const instantSpeed = Math.round(bytesDiff / timeDiff);
+        // Exponential moving average for smooth, realistic transfer rate
+        item.speed = item.speed > 0 ? Math.round(0.75 * instantSpeed + 0.25 * item.speed) : instantSpeed;
+        item.lastBytes = received;
+        item.lastTime = now;
+      }
+
+      item.receivedBytes = received;
+      if (dl.totalBytes && dl.totalBytes > 0) {
+        item.totalBytes = dl.totalBytes;
+      }
+
+      if (item.totalBytes > 0) {
+        item.progress = Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100));
+        const remaining = Math.max(0, item.totalBytes - item.receivedBytes);
+        item.eta = item.speed > 0 ? Math.ceil(remaining / item.speed) : 0;
+      } else if (item.receivedBytes > 0) {
+        // Fallback estimate for chunked streams without Content-Length
+        item.progress = Math.min(95, Math.round((item.receivedBytes / (item.receivedBytes + 4 * 1024 * 1024)) * 100));
+      }
+
+      if (dl.state) {
+        item.state = dl.state;
+      }
+      if (dl.paused) {
+        item.state = "paused";
+      }
+
+      if (item.state === "complete") {
+        item.progress = 100;
+        item.speed = 0;
+        item.eta = 0;
+        finalizeDownload(item);
+      } else {
+        broadcastTelemetry("DOWNLOAD_PROGRESS", {
+          downloadId: item.downloadId,
+          title: item.title,
+          filename: item.filename,
+          url: item.url,
+          category: item.category,
+          ext: item.ext,
+          receivedBytes: item.receivedBytes,
+          totalBytes: item.totalBytes,
+          progress: item.progress,
+          speed: item.speed,
+          eta: item.eta,
+          state: item.state
+        });
+      }
+
+      currentTotalSpeed += item.speed;
+    } catch (e) {}
+  }
+
+  speedSamples.shift();
+  speedSamples.push(currentTotalSpeed);
+}
+
+function finalizeDownload(item) {
+  downloadHistory.unshift({
+    id: item.downloadId,
+    title: item.title,
+    filename: item.filename,
+    url: item.url,
+    category: item.category,
+    ext: item.ext,
+    totalBytes: item.receivedBytes || item.totalBytes,
+    completedAt: Date.now()
+  });
+  if (downloadHistory.length > 50) downloadHistory.pop();
+
+  broadcastTelemetry("DOWNLOAD_COMPLETE", {
+    downloadId: item.downloadId,
+    title: item.title,
+    filename: item.filename,
+    receivedBytes: item.receivedBytes,
+    totalBytes: item.receivedBytes,
+    progress: 100,
+    speed: 0,
+    eta: 0,
+    state: "complete"
+  });
+
+  stopTelemetryLoopIfEmpty();
+}
+
+async function initiateDownload({ url, title, tabId, category = "video", ext = "mp4", filesize = 0, totalBytes = 0, saveAs = false }) {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
   const cleanFilename = sanitizeFilename(title, ext);
 
@@ -219,6 +364,7 @@ async function initiateDownload({ url, title, tabId, category = "video", ext = "
   }
 
   const shouldAsk = saveAs || settings.askFolder;
+  const initialSize = Number(filesize || totalBytes || 0);
 
   try {
     const downloadId = await chrome.downloads.download({
@@ -228,7 +374,7 @@ async function initiateDownload({ url, title, tabId, category = "video", ext = "
       conflictAction: "uniquify"
     });
 
-    activeDownloadsMap.set(downloadId, {
+    const newItem = {
       downloadId,
       url,
       title: title || cleanFilename,
@@ -240,70 +386,47 @@ async function initiateDownload({ url, title, tabId, category = "video", ext = "
       lastBytes: 0,
       speed: 0,
       progress: 0,
-      totalBytes: 0,
+      totalBytes: initialSize,
       receivedBytes: 0,
       state: "in_progress",
       tabId
-    });
+    };
 
-    if (tabId) {
-      chrome.tabs.sendMessage(tabId, {
-        type: "DOWNLOAD_STARTED",
-        downloadId,
-        title: title || cleanFilename,
-        filename: targetPath
-      }).catch(() => {});
-    }
+    activeDownloadsMap.set(downloadId, newItem);
+    startTelemetryLoop();
+
+    broadcastTelemetry("DOWNLOAD_STARTED", {
+      downloadId,
+      title: title || cleanFilename,
+      filename: targetPath,
+      totalBytes: initialSize,
+      progress: 0,
+      speed: 0,
+      state: "in_progress"
+    });
 
     return downloadId;
   } catch (err) {
     console.error("PullDL Download Dispatch Failed:", err);
-    if (tabId) {
-      chrome.tabs.sendMessage(tabId, {
-        type: "DOWNLOAD_ERROR",
-        error: err.message
-      }).catch(() => {});
-    }
+    broadcastTelemetry("DOWNLOAD_ERROR", {
+      error: err.message,
+      title: title || cleanFilename
+    });
     throw err;
   }
 }
 
-// 5. Real-time Telemetry & Sparkline Sampling
+// 5. Real-time Telemetry & State Changes
 chrome.downloads.onChanged.addListener((delta) => {
   const item = activeDownloadsMap.get(delta.id);
   if (!item) return;
-
-  const now = Date.now();
-
-  if (delta.bytesReceived) {
-    const received = delta.bytesReceived.current;
-    const timeDiff = (now - item.lastTime) / 1000;
-
-    if (timeDiff >= 0.3) {
-      const bytesDiff = received - item.lastBytes;
-      item.speed = Math.max(0, Math.round(bytesDiff / timeDiff));
-      item.lastBytes = received;
-      item.lastTime = now;
-
-      // Update aggregate sparkline samples
-      let currentTotalSpeed = 0;
-      for (const d of activeDownloadsMap.values()) {
-        if (d.state === "in_progress" && d.speed) currentTotalSpeed += d.speed;
-      }
-      speedSamples.shift();
-      speedSamples.push(currentTotalSpeed);
-    }
-    item.receivedBytes = received;
-  }
 
   if (delta.totalBytes && delta.totalBytes.current > 0) {
     item.totalBytes = delta.totalBytes.current;
   }
 
-  if (item.totalBytes > 0) {
-    item.progress = Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100));
-    const remaining = Math.max(0, item.totalBytes - item.receivedBytes);
-    item.eta = item.speed > 0 ? Math.ceil(remaining / item.speed) : 0;
+  if (delta.bytesReceived) {
+    item.receivedBytes = delta.bytesReceived.current;
   }
 
   if (delta.state) {
@@ -311,38 +434,20 @@ chrome.downloads.onChanged.addListener((delta) => {
     if (delta.state.current === "complete") {
       item.progress = 100;
       item.speed = 0;
-      downloadHistory.unshift({
-        id: item.downloadId,
-        title: item.title,
-        filename: item.filename,
-        url: item.url,
-        category: item.category,
-        ext: item.ext,
-        totalBytes: item.receivedBytes,
-        completedAt: Date.now()
+      finalizeDownload(item);
+      return;
+    } else if (delta.state.current === "interrupted") {
+      broadcastTelemetry("DOWNLOAD_ERROR", {
+        downloadId: item.downloadId,
+        error: "Download interrupted by network or server.",
+        title: item.title
       });
-      if (downloadHistory.length > 50) downloadHistory.pop();
+      stopTelemetryLoopIfEmpty();
     }
   }
 
   if (delta.paused) {
     item.state = delta.paused.current ? "paused" : "in_progress";
-  }
-
-  if (item.tabId) {
-    chrome.tabs.sendMessage(item.tabId, {
-      type: "DOWNLOAD_PROGRESS",
-      data: {
-        downloadId: item.downloadId,
-        title: item.title,
-        receivedBytes: item.receivedBytes,
-        totalBytes: item.totalBytes,
-        progress: item.progress,
-        speed: item.speed,
-        eta: item.eta,
-        state: item.state
-      }
-    }).catch(() => {});
   }
 });
 
@@ -414,6 +519,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         tabId: tabId,
         category: message.category || "video",
         ext: message.ext || "mp4",
+        filesize: message.filesize || message.size || message.totalBytes || 0,
+        totalBytes: message.totalBytes || message.filesize || 0,
         saveAs: message.saveAs || false
       }).then((downloadId) => {
         sendResponse({ success: true, downloadId });

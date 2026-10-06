@@ -65,7 +65,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   function formatBytes(bytes) {
-    if (!bytes || bytes === 0) return "Direct Stream";
+    if (bytes === 0) return "0 B";
+    if (!bytes || !isFinite(bytes) || bytes < 0) return "Calculating...";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -333,9 +334,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         type: "TRIGGER_DOWNLOAD",
         url: f.url || currentDetectedMedia[0].url,
         title: title,
-        tabId: activeTab.id,
+        tabId: activeTab?.id,
         category: f.isAudio ? "audio" : "video",
-        ext: f.ext || "mp4"
+        ext: f.ext || "mp4",
+        filesize: f.filesize || f.size || 0,
+        totalBytes: f.filesize || f.size || 0
       });
       closeFormatSheet();
       switchView("view-downloads");
@@ -904,6 +907,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   btnSettingsClearData?.addEventListener("click", () => {
     chrome.runtime.sendMessage({ type: "CLEAR_HISTORY" });
+  });
+
+  // Live Telemetry Event Listener
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === "DOWNLOAD_PROGRESS" || msg.type === "DOWNLOAD_STARTED" || msg.type === "DOWNLOAD_COMPLETE") {
+      updateDownloadsView();
+    }
   });
 
   // Init Active Context & Realtime Poller

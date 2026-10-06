@@ -110,10 +110,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       chrome.runtime.sendMessage({
         type: "TRIGGER_DOWNLOAD",
         url: best.url,
-        title: activeTab.title,
-        tabId: activeTab.id,
-        category: "video",
-        ext: best.ext || "mp4"
+        title: activeTab?.title,
+        tabId: activeTab?.id,
+        category: best.ext === "mp3" ? "audio" : "video",
+        ext: best.ext || "mp4",
+        filesize: best.filesize || best.size || 0,
+        totalBytes: best.filesize || best.size || 0
       });
       openDownloadCenter("downloads");
     } else {

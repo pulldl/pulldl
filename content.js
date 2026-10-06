@@ -18,7 +18,8 @@
   const processedVideos = new WeakSet();
 
   function formatBytes(bytes) {
-    if (!bytes || bytes === 0) return "Direct Stream";
+    if (bytes === 0) return "0 B";
+    if (!bytes || !isFinite(bytes) || bytes < 0) return "Calculating...";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -305,16 +306,19 @@
         else if (q.includes("720") || q.includes("HD")) tagClass = "tag-hd";
         else if (f.ext === "mp3" || q.includes("AUDIO") || q.includes("MP3")) tagClass = "tag-audio";
 
+        const fSize = f.filesize || f.size || 0;
+        const szStr = fSize > 0 ? formatBytes(fSize) : (f.filesize_formatted || "");
+
         itemsHtml += `
-          <button class="pulldl-format-item" data-url="${f.url}" data-title="${title}" data-ext="${f.ext || "mp4"}" data-category="${f.ext === "mp3" ? "audio" : "video"}">
-            <span>${f.ext === "mp3" ? "🎵" : "🎬"} ${f.quality || "MP4 Stream"}</span>
+          <button class="pulldl-format-item" data-url="${f.url}" data-title="${title}" data-ext="${f.ext || "mp4"}" data-category="${f.ext === "mp3" ? "audio" : "video"}" data-filesize="${fSize}" data-quality="${f.quality || q}">
+            <span>${f.ext === "mp3" ? "🎵" : "🎬"} ${f.quality || "MP4 Stream"} ${szStr ? `• ~${szStr}` : ""}</span>
             <span class="pulldl-format-tag ${tagClass}">${(f.ext || "MP4").toUpperCase()}</span>
           </button>
         `;
       });
 
       itemsHtml += `
-        <button class="pulldl-format-item" data-url="${uniqueFmts[0]?.url}" data-title="${title}" data-ext="${uniqueFmts[0]?.ext || "mp4"}" data-saveas="true">
+        <button class="pulldl-format-item" data-url="${uniqueFmts[0]?.url}" data-title="${title}" data-ext="${uniqueFmts[0]?.ext || "mp4"}" data-category="video" data-filesize="${uniqueFmts[0]?.filesize || 0}" data-quality="${uniqueFmts[0]?.quality || "1080p"}" data-saveas="true">
           <span>⚙️ Custom Folder (Save As...)</span>
           <span class="pulldl-format-tag tag-custom">PICK</span>
         </button>
@@ -348,26 +352,26 @@
           </div>
         </div>
         ${hasFullHd ? `
-          <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp4">
+          <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp4" data-category="video" data-quality="1080p Full HD">
             <span>🎬 1080p Full HD</span>
             <span class="pulldl-format-tag tag-4k">1080P</span>
           </button>
         ` : ""}
         ${hasHd ? `
-          <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp4">
+          <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp4" data-category="video" data-quality="720p HD Video">
             <span>🎬 720p HD Video</span>
             <span class="pulldl-format-tag tag-hd">720P</span>
           </button>
         ` : ""}
-        <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp4">
+        <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp4" data-category="video" data-quality="Standard MP4 Video">
           <span>🎬 Standard Video</span>
           <span class="pulldl-format-tag tag-sd">MP4</span>
         </button>
-        <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp3" data-category="audio">
+        <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp3" data-category="audio" data-quality="High Quality Audio">
           <span>🎵 Extract Audio</span>
           <span class="pulldl-format-tag tag-audio">MP3</span>
         </button>
-        <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp4" data-saveas="true">
+        <button class="pulldl-format-item" data-url="${directUrl}" data-title="${title}" data-ext="mp4" data-category="video" data-quality="Custom Folder MP4" data-saveas="true">
           <span>⚙️ Custom Folder (Save As...)</span>
           <span class="pulldl-format-tag tag-custom">PICK</span>
         </button>
@@ -407,15 +411,18 @@
           const title = item.getAttribute("data-title") || getCleanPageTitle();
           const ext = item.getAttribute("data-ext") || "mp4";
           const category = item.getAttribute("data-category") || "video";
+          const filesize = Number(item.getAttribute("data-filesize")) || 0;
+          const quality = item.getAttribute("data-quality") || "";
           const saveAs = item.getAttribute("data-saveas") === "true";
 
           if (url && !url.startsWith("blob:")) {
-            chrome.runtime.sendMessage({
-              type: "TRIGGER_DOWNLOAD",
+            showDownloadInfoModal({
               url,
               title,
               ext,
               category,
+              filesize,
+              quality,
               saveAs
             });
           } else {
@@ -439,22 +446,26 @@
         }, (resp) => {
           if (resp?.success && resp.data?.formats?.length > 0) {
             const best = resp.data.formats[0];
-            chrome.runtime.sendMessage({
-              type: "TRIGGER_DOWNLOAD",
+            showDownloadInfoModal({
               url: best.url,
               title: resp.data.title || title,
               ext: best.ext || "mp4",
-              category: "video"
+              category: best.ext === "mp3" ? "audio" : "video",
+              filesize: best.filesize || best.size || 0,
+              quality: best.quality || "1080p Full HD"
             });
+          } else {
+            window.open(`https://pulldl.com/?url=${encodeURIComponent(window.location.href)}`, "_blank");
           }
         });
       } else {
-        chrome.runtime.sendMessage({
-          type: "TRIGGER_DOWNLOAD",
+        showDownloadInfoModal({
           url: directUrl,
           title: title,
           ext: "mp4",
-          category: "video"
+          category: "video",
+          filesize: 0,
+          quality: "Direct MP4 Video"
         });
       }
     });
@@ -487,110 +498,399 @@
     parent.appendChild(container);
   }
 
-  // 6. Executive Telemetry HUD Modal
-  function createOrUpdateDownloadHud(data) {
-    let hud = document.getElementById("pulldl-active-hud");
+  // ========================================================
+  // 6. IDM-GRADE DOWNLOAD MODALS & ACTIVE ENGINE STATUS
+  // ========================================================
 
-    if (!hud) {
-      hud = document.createElement("div");
-      hud.id = "pulldl-active-hud";
-      hud.className = "pulldl-hud-panel";
-      document.body.appendChild(hud);
+  function sanitizeFilenameTitle(name, fallbackExt = "mp4") {
+    if (!name) return "PullDL_Media_" + Date.now() + "." + fallbackExt;
+    let clean = name.replace(/[<>:"/\\|?*\x00-\x1F]/g, " ").replace(/\s+/g, " ").trim().substring(0, 95);
+    if (!clean.toLowerCase().endsWith("." + fallbackExt)) {
+      clean += "." + fallbackExt;
+    }
+    return clean;
+  }
+
+  function makeDraggable(element, handle) {
+    if (!element || !handle) return;
+    let isDragging = false, startX, startY, origLeft, origTop;
+
+    handle.addEventListener("mousedown", (e) => {
+      if (e.target.tagName === "BUTTON" || e.target.closest("button")) return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = element.getBoundingClientRect();
+      origLeft = rect.left;
+      origTop = rect.top;
+      element.style.right = "auto";
+      element.style.bottom = "auto";
+      element.style.left = `${origLeft}px`;
+      element.style.top = `${origTop}px`;
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      element.style.left = `${Math.max(10, Math.min(window.innerWidth - 120, origLeft + dx))}px`;
+      element.style.top = `${Math.max(10, Math.min(window.innerHeight - 80, origTop + dy))}px`;
+    });
+
+    document.addEventListener("mouseup", () => {
+      isDragging = false;
+    });
+  }
+
+  // Step 1: IDM-Grade Download File Info Modal
+  function showDownloadInfoModal(mediaData) {
+    document.querySelectorAll(".pulldl-modal-backdrop, .pulldl-fileinfo-dialog").forEach((el) => el.remove());
+    document.querySelectorAll(".pulldl-format-dropdown.show").forEach((el) => el.classList.remove("show"));
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "pulldl-modal-backdrop";
+
+    const dialog = document.createElement("div");
+    dialog.className = "pulldl-fileinfo-dialog";
+
+    const title = mediaData.title || getCleanPageTitle();
+    const rawExt = (mediaData.ext || "mp4").toLowerCase();
+    const initialCategory = mediaData.category || (rawExt === "mp3" || rawExt === "m4a" || rawExt === "wav" ? "audio" : "video");
+    const rawSize = mediaData.filesize || mediaData.size || 0;
+    const sizeStr = rawSize > 0 ? formatBytes(rawSize) : "Calculating...";
+    const quality = mediaData.quality || (rawExt === "mp3" ? "320 kbps MP3" : "1080p Full HD");
+    const cleanName = sanitizeFilenameTitle(title, rawExt);
+
+    dialog.innerHTML = `
+      <div class="pulldl-dialog-header">
+        <div class="pulldl-dialog-brand">
+          <span class="pulldl-brand-badge">◈ PullDL Studio</span>
+          <span class="pulldl-dialog-title">Download File Info</span>
+        </div>
+        <button class="pulldl-dialog-close" id="pulldl-dialog-close-btn" title="Cancel">✕</button>
+      </div>
+
+      <div class="pulldl-dialog-body">
+        <div class="pulldl-field-group">
+          <label class="pulldl-field-label">Source URL</label>
+          <div class="pulldl-url-display" title="${mediaData.url || window.location.href}">
+            <span>🔗</span>
+            <span style="overflow: hidden; text-overflow: ellipsis;">${mediaData.url || window.location.href}</span>
+          </div>
+        </div>
+
+        <div class="pulldl-field-group">
+          <label class="pulldl-field-label">Category</label>
+          <div class="pulldl-category-group" id="pulldl-category-group">
+            <button class="pulldl-cat-btn ${initialCategory === "video" ? "active" : ""}" data-cat="video" data-ext="mp4">🎬 Video</button>
+            <button class="pulldl-cat-btn ${initialCategory === "audio" ? "active" : ""}" data-cat="audio" data-ext="mp3">🎵 Audio</button>
+            <button class="pulldl-cat-btn ${initialCategory === "archive" ? "active" : ""}" data-cat="archive" data-ext="zip">📦 Archive</button>
+            <button class="pulldl-cat-btn ${initialCategory === "file" ? "active" : ""}" data-cat="file" data-ext="${rawExt}">📄 Document</button>
+          </div>
+        </div>
+
+        <div class="pulldl-field-group">
+          <label class="pulldl-field-label">File Name</label>
+          <input type="text" class="pulldl-filename-input" id="pulldl-input-filename" value="${cleanName}" spellcheck="false" autocomplete="off" />
+        </div>
+
+        <div class="pulldl-meta-badges-row">
+          <div>Size: <span class="pulldl-badge-size">${sizeStr}</span></div>
+          <div>Quality: <span class="pulldl-badge-format">${quality}</span></div>
+          <div>Engine: <span class="pulldl-badge-thread">⚡ 8 Threads</span></div>
+        </div>
+
+        <div class="pulldl-path-row">
+          <div>Folder: <span class="pulldl-path-folder" id="pulldl-folder-preview">Downloads/PullDL/${initialCategory === "audio" ? "Music" : "Videos"}/</span></div>
+          <label class="pulldl-checkbox-label">
+            <input type="checkbox" id="pulldl-chk-saveas" ${mediaData.saveAs ? "checked" : ""} />
+            <span>Choose Folder (Save As)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="pulldl-dialog-footer">
+        <button class="pulldl-btn-cancel" id="pulldl-btn-dialog-cancel">Cancel</button>
+        <button class="pulldl-btn-start" id="pulldl-btn-dialog-start">⚡ Start Download</button>
+      </div>
+    `;
+
+    backdrop.appendChild(dialog);
+    document.body.appendChild(backdrop);
+
+    makeDraggable(dialog, dialog.querySelector(".pulldl-dialog-header"));
+
+    let selectedCat = initialCategory;
+    let selectedExt = rawExt;
+
+    dialog.querySelectorAll(".pulldl-cat-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        dialog.querySelectorAll(".pulldl-cat-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        selectedCat = btn.getAttribute("data-cat");
+        const newExt = btn.getAttribute("data-ext");
+        if (newExt) selectedExt = newExt;
+
+        const inputEl = dialog.querySelector("#pulldl-input-filename");
+        let currentVal = inputEl.value;
+        currentVal = currentVal.replace(/\.[a-zA-Z0-9]+$/, "") + "." + selectedExt;
+        inputEl.value = currentVal;
+
+        const folderEl = dialog.querySelector("#pulldl-folder-preview");
+        if (selectedCat === "audio") folderEl.textContent = "Downloads/PullDL/Music/";
+        else if (selectedCat === "archive") folderEl.textContent = "Downloads/PullDL/Archives/";
+        else folderEl.textContent = "Downloads/PullDL/Videos/";
+      });
+    });
+
+    const closeDialog = () => backdrop.remove();
+    dialog.querySelector("#pulldl-dialog-close-btn")?.addEventListener("click", closeDialog);
+    dialog.querySelector("#pulldl-btn-dialog-cancel")?.addEventListener("click", closeDialog);
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) closeDialog();
+    });
+
+    dialog.querySelector("#pulldl-btn-dialog-start")?.addEventListener("click", () => {
+      const editedName = dialog.querySelector("#pulldl-input-filename").value.trim() || cleanName;
+      const saveAs = dialog.querySelector("#pulldl-chk-saveas").checked;
+
+      closeDialog();
+
+      // Trigger high-speed download through background service worker
+      chrome.runtime.sendMessage({
+        type: "TRIGGER_DOWNLOAD",
+        url: mediaData.url,
+        title: editedName,
+        filesize: rawSize,
+        totalBytes: rawSize,
+        category: selectedCat,
+        ext: selectedExt,
+        saveAs: saveAs
+      });
+
+      // Show Step 2: Live Download Status Window immediately
+      showDownloadStatusWindow({
+        title: editedName,
+        filesize: rawSize,
+        totalBytes: rawSize,
+        receivedBytes: 0,
+        progress: 0,
+        speed: 0,
+        eta: 0,
+        state: "in_progress",
+        category: selectedCat,
+        ext: selectedExt,
+        url: mediaData.url
+      });
+    });
+  }
+
+  // Step 2: IDM-Grade Download Status Window
+  let activeStatusWindow = null;
+  let activeMinimizedPill = null;
+  let activeDownloadState = null;
+
+  function showDownloadStatusWindow(data) {
+    if (!data) return;
+    activeDownloadState = { ...(activeDownloadState || {}), ...data };
+
+    if (activeMinimizedPill && !activeStatusWindow) {
+      updateMinimizedPill(activeDownloadState);
+      return;
     }
 
-    const speed = formatSpeed(data.speed);
-    const progress = data.progress || 0;
-    const receivedStr = formatBytes(data.receivedBytes);
-    const totalStr = formatBytes(data.totalBytes);
-    const etaStr = formatEta(data.eta);
+    if (!activeStatusWindow) {
+      activeStatusWindow = document.createElement("div");
+      activeStatusWindow.id = "pulldl-active-status-window";
+      activeStatusWindow.className = "pulldl-status-window";
+      document.body.appendChild(activeStatusWindow);
+    }
+
+    renderStatusWindowContent(activeStatusWindow, activeDownloadState);
+  }
+
+  function renderStatusWindowContent(win, data) {
     const isComplete = data.state === "complete";
     const isPaused = data.state === "paused";
+    const speed = formatSpeed(data.speed);
+    const progress = Math.min(100, Math.max(0, data.progress || 0));
+    const receivedStr = formatBytes(data.receivedBytes || 0);
+    const totalStr = formatBytes(data.totalBytes || data.filesize || 0);
+    const etaStr = formatEta(data.eta);
+    const categoryIcon = data.category === "audio" || (data.ext && data.ext.includes("mp3")) ? "🎵" : "🎬";
+    const title = data.title || "PullDL_Download";
 
     const chunkBars = Array.from({ length: 8 }).map((_, i) => {
-      const chunkProg = Math.min(100, Math.max(0, (progress - (i * 12)) * (100 / 12)));
+      const baseProg = Math.min(100, Math.max(0, (progress - (i * 10)) * (100 / 20)));
       return `
-        <div class="pulldl-chunk-bar">
-          <div class="pulldl-chunk-fill" style="width: ${chunkProg}%"></div>
+        <div class="pulldl-chunk-bar" title="Segment #${i + 1}: ${baseProg.toFixed(0)}%">
+          <div class="pulldl-chunk-fill" style="width: ${isComplete ? 100 : baseProg}%"></div>
         </div>
       `;
     }).join("");
 
-    hud.innerHTML = `
-      <div class="pulldl-hud-header">
-        <div class="pulldl-hud-title-wrap">
-          <div class="pulldl-hud-pulse" style="background: ${isComplete ? "#00E676" : "#38bdf8"}; box-shadow: 0 0 10px ${isComplete ? "#00E676" : "#38bdf8"};"></div>
-          <div class="pulldl-hud-title" title="${data.title}">${data.title}</div>
+    win.innerHTML = `
+      <div class="pulldl-win-header">
+        <div class="pulldl-win-brand">
+          <div class="pulldl-win-pulse" style="background: ${isComplete ? "#00E676" : isPaused ? "#f59e0b" : "#38bdf8"}; box-shadow: 0 0 10px ${isComplete ? "#00E676" : isPaused ? "#f59e0b" : "#38bdf8"};"></div>
+          <span class="pulldl-win-title">PullDL Turbo Engine — ${isComplete ? "Finished" : isPaused ? "Paused" : "Downloading"}</span>
         </div>
-        <button class="pulldl-hud-close" id="pulldl-hud-close-btn" title="Dismiss">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+        <div class="pulldl-win-controls">
+          <button class="pulldl-win-btn" id="pulldl-btn-win-min" title="Minimize to pill">—</button>
+          <button class="pulldl-win-btn" id="pulldl-btn-win-close" title="Close">✕</button>
+        </div>
       </div>
 
-      <div class="pulldl-telemetry-row">
-        <div class="pulldl-speed-badge">
-          <span class="pulldl-speed-num">${isComplete ? "100%" : isPaused ? "PAUSED" : speed.num}</span>
+      <div class="pulldl-file-row">
+        <span>${categoryIcon}</span>
+        <span class="pulldl-file-name" title="${title}">${title}</span>
+        <span class="pulldl-state-pill" style="color: ${isComplete ? "#00E676" : isPaused ? "#fbbf24" : "#38bdf8"}; border-color: ${isComplete ? "rgba(0,230,118,0.4)" : isPaused ? "rgba(251,191,36,0.4)" : "rgba(56,189,248,0.4)"}">
+          ${isComplete ? "COMPLETE" : isPaused ? "PAUSED" : "8 THREADS"}
+        </span>
+      </div>
+
+      <div class="pulldl-speed-hud">
+        <div class="pulldl-speed-readout">
+          <span class="pulldl-speed-digits">${isComplete ? "100%" : isPaused ? "PAUSED" : speed.num}</span>
           <span class="pulldl-speed-unit">${isComplete ? "DONE" : isPaused ? "" : speed.unit}</span>
         </div>
         ${!isComplete && !isPaused ? `
           <div class="pulldl-waveform">
-            <div class="pulldl-waveform-bar"></div>
-            <div class="pulldl-waveform-bar"></div>
-            <div class="pulldl-waveform-bar"></div>
-            <div class="pulldl-waveform-bar"></div>
-            <div class="pulldl-waveform-bar"></div>
+            <div class="pulldl-wave-bar"></div>
+            <div class="pulldl-wave-bar"></div>
+            <div class="pulldl-wave-bar"></div>
+            <div class="pulldl-wave-bar"></div>
+            <div class="pulldl-wave-bar"></div>
+            <div class="pulldl-wave-bar"></div>
           </div>
         ` : ""}
       </div>
 
-      <div class="pulldl-progress-track">
-        <div class="pulldl-progress-fill" style="width: ${progress}%"></div>
+      <div class="pulldl-master-progress-track">
+        <div class="pulldl-master-progress-fill" style="width: ${progress}%;"></div>
+      </div>
+
+      <div class="pulldl-idm-grid">
+        <div class="pulldl-idm-cell">
+          <span class="pulldl-idm-lbl">File Size:</span>
+          <span class="pulldl-idm-val">${totalStr}</span>
+        </div>
+        <div class="pulldl-idm-cell">
+          <span class="pulldl-idm-lbl">Downloaded:</span>
+          <span class="pulldl-idm-val">${receivedStr} (${progress}%)</span>
+        </div>
+        <div class="pulldl-idm-cell">
+          <span class="pulldl-idm-lbl">Transfer Rate:</span>
+          <span class="pulldl-idm-val">${isComplete ? "Completed" : isPaused ? "0 KB/s" : `${speed.num} ${speed.unit}`}</span>
+        </div>
+        <div class="pulldl-idm-cell">
+          <span class="pulldl-idm-lbl">Time Left:</span>
+          <span class="pulldl-idm-val">${isComplete ? "00:00" : etaStr}</span>
+        </div>
+        <div class="pulldl-idm-cell" style="grid-column: span 2;">
+          <span class="pulldl-idm-lbl">Resume Capability:</span>
+          <span class="pulldl-idm-val" style="color: #00E676;">Yes (HTTP 206 Supported)</span>
+        </div>
+      </div>
+
+      <div class="pulldl-chunks-header">
+        <span>Parallel Connection Segments (8 Threads)</span>
+        <span>${progress}%</span>
       </div>
 
       <div class="pulldl-chunks-container">
         ${chunkBars}
       </div>
 
-      <div class="pulldl-hud-footer">
-        <div>${receivedStr} / ${totalStr} • ETA: ${etaStr}</div>
-        <div class="pulldl-hud-actions">
-          ${isComplete ? `
-            <button class="pulldl-action-btn btn-finish" id="pulldl-btn-open">Open File</button>
-            <button class="pulldl-action-btn" id="pulldl-btn-folder">Folder</button>
-          ` : `
-            <button class="pulldl-action-btn" id="pulldl-btn-toggle-pause">
-              ${isPaused ? "Resume ▶️" : "Pause ⏸️"}
-            </button>
-            <button class="pulldl-action-btn" id="pulldl-btn-cancel">Cancel</button>
-          `}
-        </div>
+      <div class="pulldl-win-actions">
+        ${isComplete ? `
+          <button class="pulldl-action-btn btn-finish" id="pulldl-btn-act-open">📂 Open File</button>
+          <button class="pulldl-action-btn" id="pulldl-btn-act-folder">📁 Open Folder</button>
+          <button class="pulldl-action-btn" id="pulldl-btn-act-done">Close</button>
+        ` : `
+          <button class="pulldl-action-btn" id="pulldl-btn-act-pause">
+            ${isPaused ? "Resume ▶" : "Pause ⏸"}
+          </button>
+          <button class="pulldl-action-btn" id="pulldl-btn-act-cancel">Cancel ✕</button>
+          <button class="pulldl-action-btn" id="pulldl-btn-act-hide">Hide</button>
+        `}
       </div>
     `;
 
-    hud.querySelector("#pulldl-hud-close-btn")?.addEventListener("click", () => hud.remove());
+    win.querySelector("#pulldl-btn-win-close")?.addEventListener("click", () => {
+      win.remove();
+      activeStatusWindow = null;
+    });
+
+    win.querySelector("#pulldl-btn-win-min")?.addEventListener("click", () => {
+      minimizeStatusWindow();
+    });
 
     if (isComplete) {
-      hud.querySelector("#pulldl-btn-open")?.addEventListener("click", () => {
+      win.querySelector("#pulldl-btn-act-open")?.addEventListener("click", () => {
         chrome.runtime.sendMessage({ type: "OPEN_DOWNLOAD", downloadId: data.downloadId });
       });
-      hud.querySelector("#pulldl-btn-folder")?.addEventListener("click", () => {
+      win.querySelector("#pulldl-btn-act-folder")?.addEventListener("click", () => {
         chrome.runtime.sendMessage({ type: "SHOW_IN_FOLDER", downloadId: data.downloadId });
       });
+      win.querySelector("#pulldl-btn-act-done")?.addEventListener("click", () => {
+        win.remove();
+        activeStatusWindow = null;
+      });
     } else {
-      hud.querySelector("#pulldl-btn-toggle-pause")?.addEventListener("click", () => {
+      win.querySelector("#pulldl-btn-act-pause")?.addEventListener("click", () => {
         if (isPaused) {
           chrome.runtime.sendMessage({ type: "RESUME_DOWNLOAD", downloadId: data.downloadId });
         } else {
           chrome.runtime.sendMessage({ type: "PAUSE_DOWNLOAD", downloadId: data.downloadId });
         }
       });
-      hud.querySelector("#pulldl-btn-cancel")?.addEventListener("click", () => {
+      win.querySelector("#pulldl-btn-act-cancel")?.addEventListener("click", () => {
         chrome.runtime.sendMessage({ type: "CANCEL_DOWNLOAD", downloadId: data.downloadId });
-        hud.remove();
+        win.remove();
+        activeStatusWindow = null;
+      });
+      win.querySelector("#pulldl-btn-act-hide")?.addEventListener("click", () => {
+        minimizeStatusWindow();
       });
     }
+
+    makeDraggable(win, win.querySelector(".pulldl-win-header"));
+  }
+
+  function minimizeStatusWindow() {
+    if (activeStatusWindow) {
+      activeStatusWindow.remove();
+      activeStatusWindow = null;
+    }
+
+    if (!activeMinimizedPill) {
+      activeMinimizedPill = document.createElement("div");
+      activeMinimizedPill.className = "pulldl-minimized-pill";
+      document.body.appendChild(activeMinimizedPill);
+
+      activeMinimizedPill.addEventListener("click", () => {
+        activeMinimizedPill.remove();
+        activeMinimizedPill = null;
+        if (activeDownloadState) {
+          showDownloadStatusWindow(activeDownloadState);
+        }
+      });
+    }
+
+    updateMinimizedPill(activeDownloadState);
+  }
+
+  function updateMinimizedPill(data) {
+    if (!activeMinimizedPill || !data) return;
+    const speed = formatSpeed(data.speed);
+    const progress = Math.min(100, Math.max(0, data.progress || 0));
+    const isComplete = data.state === "complete";
+    activeMinimizedPill.innerHTML = `
+      <span style="color: ${isComplete ? "#00E676" : "#38bdf8"};">◈</span>
+      <span>${isComplete ? "Complete ✓" : `${progress}% • ${speed.num} ${speed.unit}`}</span>
+      <span style="color: #94a3b8; font-size: 10px;">↗</span>
+    `;
   }
 
   // 7. Page Link Scraper for LinkGrabber
@@ -624,19 +924,16 @@
       } catch (e) {}
     }
 
-    // Sniff DOM video/audio/sources
     document.querySelectorAll("video, audio, source").forEach((el) => {
       const src = el.src || el.getAttribute("src");
       if (src) addUrl(src, el.title || document.title, el.tagName === "AUDIO" ? "audio" : "video");
     });
 
-    // Sniff <a> tags
     document.querySelectorAll("a[href]").forEach((a) => {
       const href = a.getAttribute("href");
       addUrl(href, a.innerText || a.getAttribute("title") || a.getAttribute("aria-label") || "");
     });
 
-    // Sniff detected candidate streams
     for (const [url, cand] of detectedCandidates.entries()) {
       addUrl(url, getCleanPageTitle(), cand.format === "MP3" ? "audio" : "video");
     }
@@ -651,18 +948,20 @@
       sendResponse({ success: true, links: links });
       return true;
     } else if (message.type === "DOWNLOAD_STARTED") {
-      createOrUpdateDownloadHud({
-        downloadId: message.downloadId,
-        title: message.title,
+      showDownloadStatusWindow({
+        downloadId: message.data?.downloadId || message.downloadId,
+        title: message.data?.title || message.title,
         speed: 0,
         progress: 1,
         receivedBytes: 0,
-        totalBytes: 0,
+        totalBytes: message.data?.totalBytes || message.totalBytes || 0,
         eta: 0,
         state: "in_progress"
       });
     } else if (message.type === "DOWNLOAD_PROGRESS") {
-      createOrUpdateDownloadHud(message.data);
+      showDownloadStatusWindow(message.data);
+    } else if (message.type === "DOWNLOAD_COMPLETE") {
+      showDownloadStatusWindow({ ...message.data, progress: 100, state: "complete" });
     }
   });
 
