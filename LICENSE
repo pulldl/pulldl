@@ -7,30 +7,27 @@ TERMS AND CONDITIONS FOR USE, INSPECTION, AND CONTRIBUTIONS
 ================================================================================
 
 1. GRANT OF PERMISSION
-Permission is hereby granted to any individual to view, inspect, audit, and run
-this software ("PullDL Extension") solely for personal, non-commercial purposes,
+Permission is hereby granted to any individual to view, inspect, audit, and evaluate
+this repository and showcase solely for personal, non-commercial purposes,
 subject to the strict restrictions set forth herein.
 
 2. STRICT RESTRICTIONS & PROHIBITIONS
 Under this license, you MAY NOT:
-  a. Republish, re-upload, distribute, or submit this software, or any modified
-     or derivative versions thereof, to any public browser extension store,
-     including but not limited to the Google Chrome Web Store, Microsoft Edge
-     Add-ons, Mozilla Firefox Add-ons (AMO), Opera Add-ons, or any third-party
-     extension repository.
+  a. Republish, re-upload, distribute, commercialize, or deploy this software,
+     website architecture, design systems, or any portion thereof as a public service.
   b. Commercialize, sell, rent, lease, monetize, or sublicense the software or
      any portion of its source code, assets, or architecture.
   c. Copy, replicate, clone, or counterfeit the visual design, user interface (UI),
      user experience (UX), layout, CSS styles, icons, brand assets, or the website
      architecture of PullDL (https://pulldl.com).
   d. Remove, alter, or obscure any copyright notices, trademarks, or proprietary
-     legends contained within the source code or associated documentation.
+     legends contained within the repository or associated documentation.
 
 3. TRADEMARKS & BRANDING
 The name "PullDL", the PullDL logo, branding, graphics, and website styling are
 the exclusive intellectual property and trademarks of Mahean Ahmed. This license
 does not grant any rights or permission to use the PullDL name, logo, or likeness
-in any unauthorized fork, product, or publication.
+in any unauthorized product, fork, or publication.
 
 4. CONTRIBUTIONS
 By submitting any code, pull request, bug fix, or contribution to this repository,
@@ -38,7 +35,7 @@ you agree to assign all rights, title, and interest in such contributions to
 Mahean Ahmed / PullDL, ensuring the unified integrity of the software.
 
 5. ENFORCEMENT & DMCA
-Any unauthorized distribution, store listing, code cloning, or trademark
+Any unauthorized distribution, code cloning, UI theft, or trademark
 infringement will be met with immediate Digital Millennium Copyright Act (DMCA)
 takedown notices and appropriate legal remedies.
 

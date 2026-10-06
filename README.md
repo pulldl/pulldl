@@ -1,114 +1,134 @@
 <div align="center">
-  <img src="./assets/logo.png" alt="PullDL Logo" width="96" height="96" />
-  <h1>⚡ PullDL v3.0.0 — Universal Media Sniffer & Turbo Manager</h1>
-  <p><strong>Universal 7-Layer In-Browser Media Sniffer, Adaptive Multi-Thread Turbo Manager, and JDownloader Batch LinkGrabber for Chrome, Edge, and Brave.</strong></p>
+  <a href="https://pulldl.com">
+    <img src="./assets/logo.png" alt="PullDL Logo" width="140" height="140" />
+  </a>
+  <h1>PullDL — Universal Web Media Downloader & File Studio</h1>
+  <p><strong>Fast, zero-friction, privacy-first media downloads and format conversions from 1,350+ platforms directly on the web at <a href="https://pulldl.com">pulldl.com</a>.</strong></p>
 
   <p>
-    <a href="https://pulldl.com"><img src="https://img.shields.io/badge/Official_Website-pulldl.com-0284c7?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Source--Available_(Protected)-red?style=for-the-badge" alt="License" /></a>
-    <img src="https://img.shields.io/badge/Speed_Engine-16--Thread_Turbo-00C853?style=for-the-badge" alt="Turbo Engine" />
-    <img src="https://img.shields.io/badge/Detection-7--Layer_Universal-00e5ff?style=for-the-badge" alt="7 Layer Detection" />
-    <img src="https://img.shields.io/badge/Supported_Sites-1%2C290%2B-blueviolet?style=for-the-badge" alt="Supported Platforms" />
+    <a href="https://pulldl.com"><img src="https://img.shields.io/badge/Official_Website-pulldl.com-00F2FE?style=for-the-badge&logo=google-chrome&logoColor=black" alt="Website" /></a>
+    <img src="https://img.shields.io/badge/Status-100%25_Live_%26_Operational-00C853?style=for-the-badge" alt="Status" />
+    <img src="https://img.shields.io/badge/Platforms-1%2C350%2B_Supported-7928CA?style=for-the-badge" alt="Supported Platforms" />
+    <img src="https://img.shields.io/badge/Video_Quality-Up_to_8K_UHD-FF0080?style=for-the-badge" alt="Video Quality" />
+    <img src="https://img.shields.io/badge/Audio-320kbps_MP3_%2B_ID3-0070F3?style=for-the-badge" alt="Audio Quality" />
+    <img src="https://img.shields.io/badge/Privacy-Zero_Logs_%E2%80%A2_Zero_Ads-10B981?style=for-the-badge" alt="Privacy" />
   </p>
 
   <p>
-    <a href="https://pulldl.com"><strong>Explore Web Studio</strong></a> •
-    <a href="#-quick-install"><strong>Install Extension</strong></a> •
-    <a href="#-features"><strong>Features</strong></a> •
-    <a href="#-7-layer-detection-engine"><strong>7-Layer Engine</strong></a> •
+    <a href="https://pulldl.com"><strong>Launch Web App 🚀</strong></a> •
+    <a href="#-overview"><strong>Overview</strong></a> •
+    <a href="#-flagship-features"><strong>Features</strong></a> •
     <a href="#-supported-platforms"><strong>Supported Sites</strong></a> •
-    <a href="#-legal--anti-cloning-notice"><strong>Legal Notice</strong></a>
+    <a href="#-architecture--stream-pipeline"><strong>Architecture</strong></a> •
+    <a href="#-privacy--security"><strong>Privacy</strong></a> •
+    <a href="#-legal--trademark"><strong>Legal</strong></a>
   </p>
+
+  <br />
+
+  <a href="https://pulldl.com">
+    <img src="./assets/preview.png" alt="PullDL Web Studio Interface" width="900" />
+  </a>
 </div>
 
 ---
 
 ## 🌟 Overview
 
-**PullDL Universal Studio (v3.0.0)** is the next-generation, pure in-browser replacement for legacy desktop download managers like IDM, XDM, and JDownloader. Built strictly for Manifest V3 with zero desktop helper binaries or invasive background daemons, PullDL auto-detects video and audio streams across **any website** on the internet, anchors an executive draggable download pill to playing videos, extracts true 4K/1080p and HLS streams via our cloud extraction pipeline, and provides an integrated **JDownloader-style Batch LinkGrabber** for parallel multi-file acquisition.
+**PullDL ([pulldl.com](https://pulldl.com))** is an executive, privacy-first universal web media downloader and client-side conversion studio. Designed as an ad-free, high-speed alternative to cluttered download sites and intrusive desktop software, PullDL enables users to paste any video, audio, or media URL and instantly stream or save it in pristine fidelity.
+
+With native support for over **1,350+ streaming platforms**, intelligent adaptive stream muxing (4K/8K DASH), studio-grade 320kbps MP3 audio extraction with ID3 tagging, and real-time piped chunk streaming, PullDL delivers an elite media download experience directly inside any modern browser on desktop and mobile.
 
 ---
 
-## ✨ Flagship Features (v3.0.0 Studio Edition)
+## ✨ Flagship Features
 
-- 🎯 **Draggable Floating Video Pill:** An executive Obsidian Glass pill attaches cleanly to video players with glowing radar indicators, fully draggable so it never covers player controls or subtitles.
-- 🎛️ **Cobalt-Style 440px Executive Dashboard (5 Tabs):**
-  - **Streams:** Real-time detected streams with resolution badges (`[4K UHD]`, `[1080p FHD]`, `[720p HD]`, `[MP3]`), file size, confidence score, and 1-Click "Download All".
-  - **LinkGrabber:** JDownloader-grade batch link collector with "Scrape Current Page", "Paste Clipboard", category filters (Videos, Audio, Images, Archives), and 1-click batch dispatcher.
-  - **Active Tasks:** Digital speedometer (`MB/s`), 8-thread connection visualizer, animated packet waveforms, progress bars, ETA, and pause/resume/cancel controls.
-  - **History:** Session catalog of completed files with "Open File" and "Show in Folder" actions.
-  - **Config:** Multi-thread acceleration modes (4, 8 Turbo, 16 Extreme Gig-E) and smart folder sorting.
-- 📁 **Smart Folder Routing:** Automatically catalogs media into organized subdirectories:
-  - 🎬 Videos: `Downloads/PullDL/Videos/`
-  - 🎵 Music & Audio: `Downloads/PullDL/Music/`
-  - 📦 Archives: `Downloads/PullDL/Archives/`
-- ⚡ **IDM-Grade In-Page Telemetry HUD:** Live speed (`MB/s`), segment thread progress, and remaining time floating unobtrusively on-screen.
-- 🔒 **Zero Malware & 100% Free:** No cracks, no malware, no licenses, runs natively inside your browser on Windows, macOS, Linux, and ChromeOS.
+### ⚡ Universal 1,350+ Platform Ingestion
+- Extract video and audio from YouTube, Facebook, Instagram Reels, TikTok (watermark-free), Twitter/X, Reddit, Vimeo, SoundCloud, Pinterest, Twitch, Bilibili, and 1,300+ additional sources.
+- Single unified search & paste bar with automatic source detection and URL sanitization.
 
----
+### 🎬 Pristine Video Muxing (Up to 8K UHD)
+- Automatically resolves separated adaptive video and audio DASH streams.
+- Delivers complete, universally compatible MP4 files at 4K, 2K, 1080p 60FPS, and 720p HD.
+- 100% watermark-free processing for social media platforms including TikTok and Instagram.
 
-## 🔬 7-Layer Detection Engine
+### 🎵 High-Fidelity Audio & ID3 Metadata Engine
+- 1-click conversion to studio-quality **320kbps MP3** and clean AAC/M4A.
+- Automatic artist name, track title parsing, and high-resolution album artwork embedding directly into MP3 ID3v2 tags.
 
-PullDL operates seven distinct detection tiers to guarantee 100% capture rate:
+### 🚀 Zero-Wait Streaming Pipeline
+- Real-time piped chunk streaming directly from source servers to the user's browser.
+- Eliminates server storage bottlenecks and eliminates long encoding waiting screens.
+- Full HTTP Range (`206 Partial Content`) support for reliable pause and resume capability.
 
-1. **Layer 1 (DOM Media Inspection):** Scans `<video>`, `<audio>`, `<source>`, `<track>`, OpenGraph video tags, and JSON-LD schema metadata.
-2. **Layer 2 (Page Runtime Bridge):** Injected page-context instrumentation capturing dynamic `fetch()`, `XMLHttpRequest`, `HTMLMediaElement.play`, and `MediaSource` calls.
-3. **Layer 3 (Performance Timing Sniffer):** Inspects browser resource performance entries for `.m3u8`, `.mpd`, `.mp4`, `.m4s`, and fragmented streams.
-4. **Layer 4 (WebRequest Sniffer):** Listens on response headers for media MIME types (`video/*`, `audio/*`, `application/vnd.apple.mpegurl`, `dash+xml`).
-5. **Layer 5 (Cloud API Extraction):** Cloud-assisted resolver for protected platforms (YouTube, Facebook, Instagram, TikTok, Twitter/X, Reddit) to fetch direct 4K/1080p/MP3 stream URLs.
-6. **Layer 6 (Confidence Scoring Engine):** Ranks candidate resources by bitrate, resolution, and format while filtering out tracking pixels and video advertisements.
-7. **Layer 7 (Browser-Assisted Fallback):** Safe browser-side acquisition for session-authenticated media streams.
+### 📱 PWA & Mobile QR Sync
+- Dynamic on-screen QR handoff: scan any resolved download on desktop with your iPhone or Android camera to instantly trigger the download in mobile Safari / Chrome.
+- Installable Progressive Web App (PWA) with offline caching and home screen launch.
 
----
+### 🛠️ In-Browser Client-Side File Studio
+- Integrated client-side utilities including image compression, format converters, and document processing that execute 100% locally in the browser with zero server file uploads.
 
-## 🚀 Quick Install (Developer Mode / Load Unpacked)
-
-Install and test the extension directly in your Chromium-based browser in 30 seconds:
-
-1. **Designated Location:**
-   The extension source code is maintained at:
-   `C:\MAHEAN AHMED\PullDL`
-2. **Open Extensions Manager:**
-   - Chrome / Brave: Navigate to `chrome://extensions`
-   - Microsoft Edge: Navigate to `edge://extensions`
-3. **Enable Developer Mode:**
-   - Toggle **"Developer mode"** in the top-right corner.
-4. **Load Unpacked:**
-   - Click **"Load unpacked"** and select `C:\MAHEAN AHMED\PullDL`!
-5. **Start Downloading:**
-   - Open any video website (YouTube, TikTok, Facebook, Reddit, Vimeo, etc.), play a video, and click the corner PullDL pill!
+### 🛡️ Zero Ads, Zero Tracking, Zero Popups
+- Strict privacy-first policy: no advertisements, no pop-up redirects, no cookie tracking, and zero activity logs stored.
 
 ---
 
-## 🌐 Supported Platforms (1,290+)
+## 🌐 Supported Platforms
 
-| Platform | Supported Formats | Features |
+| Platform | Supported Resolutions & Formats | Key Capabilities |
 | :--- | :--- | :--- |
-| **YouTube** | 4K UHD, 1080p FHD, 720p HD, 320kbps MP3 | Shorts, Playlists, Clean Audio |
-| **Instagram** | 1080p HD MP4, Audio | Reels, Stories, Carousels, IGTV |
-| **TikTok** | Clean 1080p MP4, MP3 | No Watermark, Original Sound |
-| **Facebook** | Full HD 1080p MP4 | Watch, Reels, Public Videos |
-| **Twitter / X** | 1080p HD MP4, GIF | Fast Tweet Media Extraction |
-| **Reddit** | Muxed HD MP4 | Synchronized Audio Track |
+| **YouTube** | 8K / 4K UHD, 1440p, 1080p 60FPS, 720p, 320kbps MP3 | Shorts, Full Videos, Playlists, Clean Audio |
+| **TikTok** | 1080p FHD MP4, Clean Audio MP3 | 100% Watermark-Free, Original Sound |
+| **Instagram** | 1080p HD MP4, MP3 | Reels, Stories, Carousels, IGTV |
+| **Facebook** | 1080p HD, 720p SD MP4 | Watch, Reels, Public Videos & Clips |
+| **Twitter / X** | 1080p HD MP4, Animated GIF | Fast Tweet Media & Spaces Audio |
+| **Reddit** | Muxed 1080p HD MP4 | Synchronized Audio-Video Muxing |
+| **SoundCloud** | 320kbps MP3, High-Res Artwork | Full Track ID3 Tagging & Metadata |
 | **Pinterest** | 1080p HD MP4 | Video Pins & Idea Pins |
-| **1,280+ Others** | MP4, WebM, MP3, HLS, DASH | Universal Stream Sniffer |
+| **Vimeo** | Up to 4K UHD MP4 | Original Source Quality |
+| **1,340+ Others** | MP4, WebM, MP3, M4A, HLS, DASH | Universal Multi-Platform Engine |
 
-👉 *For the complete searchable catalog of 1,290+ supported services, visit [pulldl.com](https://pulldl.com).*
-
----
-
-## ⚖️ Legal & Anti-Cloning Notice
-
-- **Intellectual Property:** PullDL™, the PullDL logo, brand identity, user interface designs, and web platform are the exclusive intellectual property of **Mahean Ahmed**.
-- **No Commercial Redistribution:** Sublicensing, commercial monetization, or re-uploading this extension to the Chrome Web Store, Microsoft Edge Add-ons, Firefox AMO, or any extension marketplace without prior written consent is strictly prohibited.
-- **DMCA Protected:** Unauthorized commercial clones, trademark counterfeits, or stolen design templates will be subject to immediate DMCA takedown requests.
+👉 *For the complete searchable list of supported websites and extractors, visit [pulldl.com](https://pulldl.com).*
 
 ---
 
-## 📄 License & Policies
+## 🏗️ Architecture & Stream Pipeline
 
-- 📜 [Source-Available License](LICENSE)
-- ⚖️ [Trademark & Brand Guidelines](TRADEMARK.md)
-- 🛡️ [Security & Vulnerability Reporting](SECURITY.md)
+PullDL utilizes an asynchronous, non-blocking streaming architecture designed for high concurrency and immediate response times:
 
-Copyright © 2026 Mahean Ahmed / PullDL. All Rights Reserved.
+```mermaid
+flowchart LR
+    A["User Pastes URL"] --> B["Unified Extractor Engine"]
+    B --> C["Metadata & Format Matrix"]
+    C --> D["User Selects Quality (4K / 1080p / MP3)"]
+    D --> E["Piped Async Stream Pipeline"]
+    E --> F["Direct Browser Save / Mobile QR Sync"]
+```
+
+1. **Extraction Layer:** Validates input URLs, queries extraction workers, and resolves adaptive video/audio stream manifests.
+2. **Format Synthesis:** Structures available resolutions, bitrates, file sizes, and audio tracks into a clean selection card.
+3. **Piped Delivery:** Streams chunks asynchronously over HTTP with proper `Content-Disposition`, bypasses disk caching for instant downloads, and serves native streams to client devices.
+
+---
+
+## 🔒 Privacy & Security
+
+- **No Data Retention:** We do not log downloaded files, pasted URLs, or user IP addresses.
+- **Direct Piped Streaming:** Files pass through encrypted transient memory buffers and are never retained on server storage.
+- **Client-Side Processing:** All media conversion tools under the Studio tab run via WebAssembly and Web APIs inside your browser sandbox.
+- **Encrypted Traffic:** All connections are enforced with TLS 1.3 / HTTPS encryption.
+
+---
+
+## ⚖️ Legal & Trademark
+
+- **Trademark:** PullDL™ and the PullDL logo mark are intellectual property of **Mahean Ahmed**.
+- **Fair Use:** PullDL is provided strictly for personal backup, offline viewing of user-authorized media, and educational fair use. Users are responsible for complying with the terms of service of respective media providers.
+- **DMCA Compliance:** We respect copyright holders. For inquiries, takedown requests, or partnership details, please contact: **contact@mahean.com**.
+
+---
+
+<div align="center">
+  <p>© 2026 <strong>PullDL</strong>. Built with precision for the modern web.</p>
+  <p><a href="https://pulldl.com"><strong>Visit pulldl.com</strong></a></p>
+</div>
