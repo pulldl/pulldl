@@ -1,4 +1,4 @@
-// PullDL Popup Dashboard Logic
+// PullDL Popup Executive Dashboard Logic (v2.1 Turbo)
 
 document.addEventListener("DOMContentLoaded", async () => {
   // Navigation Tabs
@@ -16,9 +16,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  // Format Helper
   function formatBytes(bytes) {
-    if (!bytes || bytes === 0) return "Unknown Size";
+    if (!bytes || bytes === 0) return "Direct Stream";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -33,15 +32,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     return Math.round(bytesPerSec / 1024) + " KB/s";
   }
 
-  // 1. Load Detected Media for Current Active Tab
+  // 1. Load Detected Media or Resolve via API
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const listContainer = document.getElementById("detected-list");
+  const emptyContainer = document.getElementById("detected-empty");
+  const countBadge = document.getElementById("badge-detected-count");
+
   if (activeTab) {
+    const isPlatform =
+      activeTab.url.includes("youtube.com") ||
+      activeTab.url.includes("youtu.be") ||
+      activeTab.url.includes("facebook.com") ||
+      activeTab.url.includes("fb.watch") ||
+      activeTab.url.includes("instagram.com") ||
+      activeTab.url.includes("tiktok.com") ||
+      activeTab.url.includes("twitter.com") ||
+      activeTab.url.includes("x.com") ||
+      activeTab.url.includes("reddit.com");
+
+    if (isPlatform) {
+      emptyContainer.innerHTML = `
+        <div class="radar-scan"></div>
+        <h3>Resolving ${activeTab.title.substring(0, 30)}...</h3>
+        <p>Fetching ultra high-bitrate media streams from PullDL Cloud Engine.</p>
+      `;
+
+      chrome.runtime.sendMessage({
+        type: "RESOLVE_PLATFORM_FORMATS",
+        pageUrl: activeTab.url
+      }, (resp) => {
+        if (resp && resp.success && resp.data && resp.data.formats && resp.data.formats.length > 0) {
+          renderPlatformFormats(resp.data);
+        } else {
+          checkSniffedMedia();
+        }
+      });
+    } else {
+      checkSniffedMedia();
+    }
+  }
+
+  function checkSniffedMedia() {
     chrome.runtime.sendMessage({ type: "GET_TAB_MEDIA", tabId: activeTab.id }, (response) => {
       const mediaList = response?.media || [];
-      const countBadge = document.getElementById("badge-detected-count");
-      const listContainer = document.getElementById("detected-list");
-      const emptyContainer = document.getElementById("detected-empty");
-
       countBadge.textContent = mediaList.length;
 
       if (mediaList.length > 0) {
@@ -61,10 +94,10 @@ document.addEventListener("DOMContentLoaded", async () => {
               <span class="media-size">${formatBytes(item.size)}</span>
             </div>
             <div class="media-title" title="${activeTab.title || item.url}">
-              ${activeTab.title || "Video Stream"}
+              ${activeTab.title || "Web Video Stream"}
             </div>
             <div class="media-actions">
-              <button class="btn-download-primary" data-url="${item.url}" data-format="${item.format}">
+              <button class="btn-download-primary" data-url="${item.url}" data-ext="${isAudio ? "mp3" : "mp4"}">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                 Download Turbo
               </button>
@@ -74,17 +107,15 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
           `;
 
-          // Bind download actions
           card.querySelector(".btn-download-primary").addEventListener("click", () => {
             chrome.runtime.sendMessage({
               type: "TRIGGER_DOWNLOAD",
               url: item.url,
               title: activeTab.title,
               tabId: activeTab.id,
-              format: item.format,
+              ext: isAudio ? "mp3" : "mp4",
               category: isAudio ? "audio" : "video"
             });
-            // Switch to Active Downloads Tab
             document.querySelector('[data-tab="tab-active"]').click();
           });
 
@@ -94,7 +125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               url: item.url,
               title: activeTab.title,
               tabId: activeTab.id,
-              format: item.format,
+              ext: isAudio ? "mp3" : "mp4",
               category: isAudio ? "audio" : "video",
               saveAs: true
             });
@@ -110,7 +141,79 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // 2. Poll & Render Active Downloads and History
+  function renderPlatformFormats(data) {
+    const title = data.title || activeTab.title;
+    const formats = data.formats || [];
+
+    countBadge.textContent = formats.length;
+    listContainer.style.display = "flex";
+    emptyContainer.style.display = "none";
+    listContainer.innerHTML = "";
+
+    // Deduplicate
+    const unique = [];
+    const seen = new Set();
+    for (const f of formats) {
+      const key = (f.quality || "") + (f.ext || "");
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(f);
+      }
+    }
+
+    unique.slice(0, 8).forEach((f) => {
+      const card = document.createElement("div");
+      card.className = "media-card";
+
+      const isAudio = f.ext === "mp3" || (f.quality && f.quality.toLowerCase().includes("audio"));
+
+      card.innerHTML = `
+        <div class="media-header">
+          <span class="media-badge ${isAudio ? "audio" : ""}">${f.quality || (f.ext || "MP4").toUpperCase()}</span>
+          <span class="media-size">${formatBytes(f.filesize)}</span>
+        </div>
+        <div class="media-title" title="${title}">${title}</div>
+        <div class="media-actions">
+          <button class="btn-download-primary btn-dl-format" data-url="${f.url}" data-ext="${f.ext || "mp4"}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download ${f.quality || "Turbo"}
+          </button>
+          <button class="btn-download-sec btn-saveas-format" data-url="${f.url}" data-ext="${f.ext || "mp4"}">
+            Save As...
+          </button>
+        </div>
+      `;
+
+      card.querySelector(".btn-dl-format").addEventListener("click", () => {
+        chrome.runtime.sendMessage({
+          type: "TRIGGER_DOWNLOAD",
+          url: f.url,
+          title: title,
+          tabId: activeTab.id,
+          ext: f.ext || "mp4",
+          category: isAudio ? "audio" : "video"
+        });
+        document.querySelector('[data-tab="tab-active"]').click();
+      });
+
+      card.querySelector(".btn-saveas-format").addEventListener("click", () => {
+        chrome.runtime.sendMessage({
+          type: "TRIGGER_DOWNLOAD",
+          url: f.url,
+          title: title,
+          tabId: activeTab.id,
+          ext: f.ext || "mp4",
+          category: isAudio ? "audio" : "video",
+          saveAs: true
+        });
+        document.querySelector('[data-tab="tab-active"]').click();
+      });
+
+      listContainer.appendChild(card);
+    });
+  }
+
+  // 2. Active Downloads & History Poller
   function updateDownloadsAndHistory() {
     chrome.runtime.sendMessage({ type: "GET_ACTIVE_DOWNLOADS" }, (response) => {
       if (!response) return;
@@ -118,7 +221,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const activeList = response.activeDownloads?.filter((d) => d.state === "in_progress" || d.state === "paused") || [];
       const historyList = response.history || [];
 
-      // Update badge
       const activeBadge = document.getElementById("badge-active-count");
       if (activeList.length > 0) {
         activeBadge.style.display = "inline-block";
@@ -127,7 +229,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeBadge.style.display = "none";
       }
 
-      // Render Active
       const activeContainer = document.getElementById("active-list");
       const activeEmpty = document.getElementById("active-empty");
 
@@ -157,7 +258,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeEmpty.style.display = "flex";
       }
 
-      // Render History
       const historyContainer = document.getElementById("history-list");
       const historyEmpty = document.getElementById("history-empty");
 
@@ -198,7 +298,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Initial update + interval
   updateDownloadsAndHistory();
   const pollInterval = setInterval(updateDownloadsAndHistory, 1000);
   window.addEventListener("unload", () => clearInterval(pollInterval));
@@ -209,7 +308,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const settingAskFolder = document.getElementById("setting-ask-folder");
   const settingFloatingBtn = document.getElementById("setting-floating-btn");
 
-  // Load saved settings
   chrome.storage.local.get({
     parallelChunks: 8,
     smartSorting: true,
@@ -222,19 +320,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     settingFloatingBtn.checked = data.floatingButton;
   });
 
-  // Save changes
   settingThreads.addEventListener("change", () => {
     chrome.storage.local.set({ parallelChunks: parseInt(settingThreads.value, 10) });
   });
-
   settingSorting.addEventListener("change", () => {
     chrome.storage.local.set({ smartSorting: settingSorting.checked });
   });
-
   settingAskFolder.addEventListener("change", () => {
     chrome.storage.local.set({ askFolder: settingAskFolder.checked });
   });
-
   settingFloatingBtn.addEventListener("change", () => {
     chrome.storage.local.set({ floatingButton: settingFloatingBtn.checked });
   });

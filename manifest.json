@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PullDL — Universal Media Downloader & Turbo Manager",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Auto-detects videos on any website. IDM-style corner download button, multi-threaded turbo speeds, and smart folder organization.",
   "permissions": [
     "storage",

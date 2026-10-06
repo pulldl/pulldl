@@ -1,11 +1,10 @@
-// PullDL Background Engine — Service Worker (Manifest V3)
-// Features: Universal Media Sniffer, Tab Media Registry, Telemetry Engine, Smart Folder Routing
+// PullDL Background Service Worker (Turbo Edition v2.1)
+// Architecture: Universal Stream Sniffer + High-Speed Extraction Resolver + Real-time Telemetry
 
 const tabMediaMap = new Map(); // tabId -> Array of Media objects
 const activeDownloadsMap = new Map(); // downloadId -> Telemetry state
 const downloadHistory = []; // Recent completed downloads
 
-// Default Settings
 const DEFAULT_SETTINGS = {
   askFolder: false,
   smartSorting: true,
@@ -20,68 +19,70 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.set(stored);
   });
 
-  // Context Menu
   chrome.contextMenus.create({
-    id: "pulldl-download-target",
-    title: "Download with PullDL (Turbo)",
-    contexts: ["link", "video", "audio"]
+    id: "pulldl-download-turbo",
+    title: "⚡ Download with PullDL Turbo",
+    contexts: ["page", "link", "video", "audio"]
   });
 });
 
-// Context Menu Action
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  const targetUrl = info.srcUrl || info.linkUrl;
-  if (targetUrl && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
-    initiateDownload({
-      url: targetUrl,
-      title: tab?.title || "Media_File",
-      tabId: tab?.id,
-      category: info.mediaType === "audio" ? "audio" : "video"
-    });
-  }
-});
-
-// Media MIME types and file extensions regex
-const MEDIA_MIME_TYPES = [
-  "video/mp4",
-  "video/webm",
-  "video/ogg",
-  "video/quicktime",
-  "video/x-matroska",
-  "video/x-flv",
-  "video/3gpp",
-  "video/mp2t",
-  "application/vnd.apple.mpegurl",
-  "application/x-mpegurl",
-  "application/dash+xml",
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/ogg",
-  "audio/wav",
-  "audio/aac",
-  "audio/flac",
-  "audio/m4a"
-];
-
-const MEDIA_URL_REGEX = /\.(mp4|webm|mkv|flv|m4v|mov|3gp|m3u8|mpd|mp3|aac|flac|wav|m4a)(\?.*)?$/i;
-
-// Clean filename helper
-function sanitizeFilename(name) {
-  if (!name) return "PullDL_Media_" + Date.now();
-  return name
+// Helper: Clean filename
+function sanitizeFilename(name, fallbackExt = "mp4") {
+  if (!name) return "PullDL_Media_" + Date.now() + "." + fallbackExt;
+  let clean = name
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
     .replace(/\s+/g, " ")
     .trim()
-    .substring(0, 120);
+    .substring(0, 110);
+  if (!clean.toLowerCase().endsWith("." + fallbackExt)) {
+    clean += "." + fallbackExt;
+  }
+  return clean;
 }
 
-// 1. Universal Network Media Sniffer
+// 1. API Stream Resolver (For YouTube, Facebook, TikTok, Instagram, Twitter/X, Reddit, etc.)
+async function resolveMediaFormatsViaApi(pageUrl) {
+  try {
+    const response = await fetch("https://pulldl.com/api/extract", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "PullDL-Browser-Extension-Turbo/2.1"
+      },
+      body: JSON.stringify({ url: pageUrl })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Extraction service returned HTTP ${response.status}`);
+    }
+
+    const json = await response.json();
+    if (json.success && json.data) {
+      return json.data;
+    }
+    throw new Error(json.detail || "Unable to extract stream metadata.");
+  } catch (err) {
+    console.error("PullDL API Resolver Error:", err);
+    throw err;
+  }
+}
+
+// 2. Direct Network Media Sniffer (for random websites with standalone video/audio files)
+const MEDIA_MIME_TYPES = [
+  "video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-matroska",
+  "application/vnd.apple.mpegurl", "application/x-mpegurl", "application/dash+xml",
+  "audio/mpeg", "audio/mp3", "audio/ogg", "audio/wav", "audio/aac", "audio/flac"
+];
+
+const MEDIA_URL_REGEX = /\.(mp4|webm|mkv|m4v|mov|m3u8|mpd|mp3|aac|flac|wav|m4a)(\?.*)?$/i;
+
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
-    if (details.tabId < 0) return; // Ignore background/extension requests
-
+    if (details.tabId < 0) return;
     const url = details.url;
-    if (url.includes("google-analytics.com") || url.includes("doubleclick.net")) return;
+
+    // Ignore telemetry and ads
+    if (url.includes("google-analytics.com") || url.includes("doubleclick.net") || url.includes("/telemetry/")) return;
 
     let mimeType = "";
     let contentLength = 0;
@@ -99,12 +100,9 @@ chrome.webRequest.onHeadersReceived.addListener(
 
     const isMediaMime = MEDIA_MIME_TYPES.some((type) => mimeType.includes(type));
     const isMediaUrl = MEDIA_URL_REGEX.test(url);
-
-    // Filter out very small chunks (< 80KB) unless it's an HLS/DASH manifest
     const isManifest = url.includes(".m3u8") || url.includes(".mpd") || mimeType.includes("mpegurl");
-    if (!isManifest && contentLength > 0 && contentLength < 80 * 1024) {
-      return;
-    }
+
+    if (!isManifest && contentLength > 0 && contentLength < 120 * 1024) return;
 
     if (isMediaMime || isMediaUrl) {
       registerDetectedMedia(details.tabId, {
@@ -120,67 +118,50 @@ chrome.webRequest.onHeadersReceived.addListener(
   ["responseHeaders"]
 );
 
-// Register detected media for a tab
 function registerDetectedMedia(tabId, mediaItem) {
   if (!tabMediaMap.has(tabId)) {
     tabMediaMap.set(tabId, []);
   }
 
   const list = tabMediaMap.get(tabId);
-  // Avoid duplicate URLs on the same tab
-  if (list.some((item) => item.url === mediaItem.url)) {
-    return;
-  }
+  if (list.some((item) => item.url === mediaItem.url)) return;
 
-  // Derive format from URL or MIME
   let format = "MP4";
-  if (mediaItem.url.includes(".m3u8") || mediaItem.mimeType.includes("mpegurl")) format = "HLS (m3u8)";
-  else if (mediaItem.url.includes(".mpd")) format = "DASH";
+  if (mediaItem.url.includes(".m3u8") || mediaItem.mimeType.includes("mpegurl")) format = "HLS Stream";
+  else if (mediaItem.url.includes(".mpd")) format = "DASH Stream";
   else if (mediaItem.mimeType.includes("audio") || mediaItem.url.includes(".mp3")) format = "MP3";
   else if (mediaItem.url.includes(".webm")) format = "WEBM";
 
   mediaItem.id = "media_" + Math.random().toString(36).substring(2, 9);
   mediaItem.format = format;
-
   list.push(mediaItem);
 
-  // Update extension badge count
   chrome.action.setBadgeText({ text: list.length.toString(), tabId });
-  chrome.action.setBadgeBackgroundColor({ color: "#00C853", tabId });
+  chrome.action.setBadgeBackgroundColor({ color: "#00E676", tabId });
 
-  // Notify content script on the tab
   chrome.tabs.sendMessage(tabId, {
-    type: "MEDIA_DETECTED",
+    type: "MEDIA_SNIFFED",
     media: mediaItem,
     totalCount: list.length
-  }).catch(() => {
-    // Content script might not be injected or ready yet; safe to ignore
-  });
+  }).catch(() => {});
 }
 
-// Clean up tab data when tab is closed
-chrome.tabs.onRemoved.addListener((tabId) => {
-  tabMediaMap.delete(tabId);
-});
+chrome.tabs.onRemoved.addListener((tabId) => tabMediaMap.delete(tabId));
 
-// 2. Download Initiation with Smart Folder Routing
-async function initiateDownload({ url, title, tabId, category = "video", format = "mp4", saveAs = false }) {
+// 3. Initiate High-Speed Download with Smart Folder Routing
+async function initiateDownload({ url, title, tabId, category = "video", ext = "mp4", saveAs = false }) {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
-  const cleanTitle = sanitizeFilename(title);
+  const cleanFilename = sanitizeFilename(title, ext);
 
-  let ext = format.toLowerCase().replace(/[^a-z0-9]/g, "");
-  if (!ext || ext.includes("hls") || ext.includes("m3u8")) ext = "mp4";
-
-  // Smart folder routing
   let targetPath = "";
   if (settings.smartSorting) {
-    if (category === "audio" || ext === "mp3" || ext === "wav" || ext === "aac") {
-      targetPath = `PullDL/Music/${cleanTitle}.${ext}`;
+    if (category === "audio" || ext.toLowerCase() === "mp3") {
+      targetPath = `PullDL/Music/${cleanFilename}`;
     } else {
-      targetPath = `PullDL/Videos/${cleanTitle}.${ext}`;
+      targetPath = `PullDL/Videos/${cleanFilename}`;
     }
   } else {
-    targetPath = `PullDL/${cleanTitle}.${ext}`;
+    targetPath = `PullDL/${cleanFilename}`;
   }
 
   const shouldAsk = saveAs || settings.askFolder;
@@ -196,7 +177,7 @@ async function initiateDownload({ url, title, tabId, category = "video", format 
     activeDownloadsMap.set(downloadId, {
       downloadId,
       url,
-      title: cleanTitle,
+      title: title || cleanFilename,
       filename: targetPath,
       startTime: Date.now(),
       lastTime: Date.now(),
@@ -209,29 +190,29 @@ async function initiateDownload({ url, title, tabId, category = "video", format 
       tabId
     });
 
-    // Notify tab HUD that download has started
     if (tabId) {
       chrome.tabs.sendMessage(tabId, {
         type: "DOWNLOAD_STARTED",
         downloadId,
-        title: cleanTitle,
+        title: title || cleanFilename,
         filename: targetPath
       }).catch(() => {});
     }
 
     return downloadId;
   } catch (err) {
-    console.error("PullDL Download failed:", err);
+    console.error("PullDL Download Dispatch Failed:", err);
     if (tabId) {
       chrome.tabs.sendMessage(tabId, {
         type: "DOWNLOAD_ERROR",
         error: err.message
       }).catch(() => {});
     }
+    throw err;
   }
 }
 
-// 3. Real-time Download Telemetry & Speed Calculations
+// 4. Real-time Telemetry & Speed Calculations
 chrome.downloads.onChanged.addListener((delta) => {
   const item = activeDownloadsMap.get(delta.id);
   if (!item) return;
@@ -242,13 +223,12 @@ chrome.downloads.onChanged.addListener((delta) => {
     const received = delta.bytesReceived.current;
     const timeDiff = (now - item.lastTime) / 1000;
 
-    if (timeDiff >= 0.5) { // update speed every 500ms
+    if (timeDiff >= 0.4) {
       const bytesDiff = received - item.lastBytes;
-      item.speed = Math.max(0, Math.round(bytesDiff / timeDiff)); // bytes/sec
+      item.speed = Math.max(0, Math.round(bytesDiff / timeDiff));
       item.lastBytes = received;
       item.lastTime = now;
     }
-
     item.receivedBytes = received;
   }
 
@@ -258,8 +238,8 @@ chrome.downloads.onChanged.addListener((delta) => {
 
   if (item.totalBytes > 0) {
     item.progress = Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100));
-    const remainingBytes = Math.max(0, item.totalBytes - item.receivedBytes);
-    item.eta = item.speed > 0 ? Math.ceil(remainingBytes / item.speed) : 0;
+    const remaining = Math.max(0, item.totalBytes - item.receivedBytes);
+    item.eta = item.speed > 0 ? Math.ceil(remaining / item.speed) : 0;
   }
 
   if (delta.state) {
@@ -282,7 +262,6 @@ chrome.downloads.onChanged.addListener((delta) => {
     item.state = delta.paused.current ? "paused" : "in_progress";
   }
 
-  // Broadcast to current tab and runtime listeners
   if (item.tabId) {
     chrome.tabs.sendMessage(item.tabId, {
       type: "DOWNLOAD_PROGRESS",
@@ -300,7 +279,7 @@ chrome.downloads.onChanged.addListener((delta) => {
   }
 });
 
-// 4. Message Router (Content script & Popup communication)
+// 5. Message Handling
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender?.tab?.id || message.tabId;
 
@@ -311,27 +290,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
     }
 
-    case "DOM_MEDIA_FOUND": {
-      // Received from content script scanning <video> tags
-      if (message.media && tabId) {
-        registerDetectedMedia(tabId, message.media);
-      }
-      sendResponse({ success: true });
-      break;
+    case "RESOLVE_PLATFORM_FORMATS": {
+      // Calls PullDL API for YouTube, Facebook, TikTok, Instagram, Twitter, etc.
+      resolveMediaFormatsViaApi(message.pageUrl)
+        .then((data) => sendResponse({ success: true, data }))
+        .catch((err) => sendResponse({ success: false, error: err.message }));
+      return true; // async
     }
 
     case "TRIGGER_DOWNLOAD": {
       initiateDownload({
         url: message.url,
-        title: message.title || sender?.tab?.title,
+        title: message.title,
         tabId: tabId,
         category: message.category || "video",
-        format: message.format || "mp4",
+        ext: message.ext || "mp4",
         saveAs: message.saveAs || false
       }).then((downloadId) => {
-        sendResponse({ downloadId });
+        sendResponse({ success: true, downloadId });
+      }).catch((err) => {
+        sendResponse({ success: false, error: err.message });
       });
-      return true; // async response
+      return true;
     }
 
     case "PAUSE_DOWNLOAD": {
