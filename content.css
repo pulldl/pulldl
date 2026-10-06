@@ -1,32 +1,335 @@
-#pulldl-floating-btn {
+/* PullDL In-Page Content Script Styles (Floating Button & Glassmorphic HUD) */
+
+/* Root Host Wrapper */
+#pulldl-root-host {
+  all: initial;
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Floating Corner Button attached to video containers */
+.pulldl-video-anchor {
+  position: relative !important;
+}
+
+.pulldl-corner-btn-container {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2147483646;
+  pointer-events: auto;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* Trigger Button */
+.pulldl-corner-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.pulldl-corner-btn:hover {
+  background: rgba(0, 200, 83, 0.95);
+  color: #0b0f19;
+  border-color: rgba(0, 200, 83, 1);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 24px rgba(0, 200, 83, 0.45);
+}
+
+.pulldl-corner-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+  transition: transform 0.2s ease;
+}
+
+.pulldl-corner-btn:hover svg {
+  transform: translateY(1px);
+}
+
+/* Format & Quality Dropdown Menu */
+.pulldl-format-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 260px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  flex-direction: column;
+  gap: 4px;
+  animation: pulldlFadeSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pulldl-format-dropdown.show {
+  display: flex;
+}
+
+.pulldl-dropdown-header {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+.pulldl-format-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: transparent;
+  color: #f1f5f9;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: all 0.18s ease;
+}
+
+.pulldl-format-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #00c853;
+  transform: translateX(2px);
+}
+
+.pulldl-format-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+
+.pulldl-format-tag.hd {
+  background: rgba(0, 200, 83, 0.2);
+  color: #00c853;
+}
+
+.pulldl-format-tag.audio {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+/* In-Page Glassmorphic IDM-Style Download HUD Modal */
+.pulldl-hud-panel {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 999999;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  width: 360px;
+  background: rgba(11, 15, 25, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 200, 83, 0.15);
+  pointer-events: auto;
   color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 12px;
-  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: pulldlSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2147483647;
+}
+
+.pulldl-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pulldl-hud-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.pulldl-hud-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+
+.pulldl-hud-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 230px;
+}
+
+.pulldl-hud-close {
+  background: transparent;
   border: none;
-  border-radius: 9999px;
-  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  color: #94a3b8;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
-  user-select: none;
-  opacity: 0.85;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
-#pulldl-floating-btn:hover {
-  transform: translateY(-2px) scale(1.04);
-  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
-  opacity: 1;
+.pulldl-hud-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
-#pulldl-floating-btn:active {
-  transform: translateY(0) scale(0.96);
+/* Telemetry Stats */
+.pulldl-telemetry-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.pulldl-speed-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #00c853;
+  letter-spacing: -0.3px;
+}
+
+.pulldl-eta-badge {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* Progress bar */
+.pulldl-progress-track {
+  width: 100%;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.pulldl-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #00c853, #00e676);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 12px rgba(0, 200, 83, 0.6);
+}
+
+/* IDM-Style 8-Chunk Connection Threads Visualizer */
+.pulldl-chunks-container {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+}
+
+.pulldl-chunk-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pulldl-chunk-fill {
+  height: 100%;
+  width: 0%;
+  background: #38bdf8;
+  transition: width 0.2s ease;
+}
+
+/* Transferred Info & Actions */
+.pulldl-hud-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.pulldl-hud-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pulldl-action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pulldl-action-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.pulldl-action-btn.success {
+  background: #00c853;
+  color: #0b0f19;
+  border-color: #00c853;
+}
+
+@keyframes pulldlSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulldlFadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

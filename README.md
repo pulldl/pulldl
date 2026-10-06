@@ -1,20 +1,20 @@
 <div align="center">
   <img src="./assets/logo.png" alt="PullDL Logo" width="96" height="96" />
-  <h1>⚡ PullDL — Universal Media & File Studio</h1>
-  <p><strong>Fast, ad-free video downloader and in-browser media utility for Chrome, Brave, and Edge.</strong></p>
+  <h1>⚡ PullDL v2.0 — Universal Media Downloader & Turbo Manager</h1>
+  <p><strong>Universal in-browser media sniffer and multi-threaded turbo download manager for Chrome, Edge, Brave, and Firefox.</strong></p>
 
   <p>
     <a href="https://pulldl.com"><img src="https://img.shields.io/badge/Official_Website-pulldl.com-0284c7?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website" /></a>
     <a href="https://github.com/pulldl/pulldl/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge" alt="License" /></a>
+    <img src="https://img.shields.io/badge/Speed_Engine-Multi--Thread_Turbo-00C853?style=for-the-badge" alt="Turbo Engine" />
     <img src="https://img.shields.io/badge/Supported_Sites-1%2C290%2B-blueviolet?style=for-the-badge" alt="Supported Platforms" />
-    <img src="https://img.shields.io/badge/Ads-Zero_Popups-success?style=for-the-badge" alt="No Ads" />
   </p>
 
   <p>
     <a href="https://pulldl.com"><strong>Explore Web Studio</strong></a> •
     <a href="#-quick-install"><strong>Install Extension</strong></a> •
-    <a href="#-supported-platforms"><strong>Supported Sites</strong></a> •
-    <a href="#-features"><strong>Features</strong></a>
+    <a href="#-features"><strong>Features</strong></a> •
+    <a href="#-supported-platforms"><strong>Supported Sites</strong></a>
   </p>
 </div>
 
@@ -22,22 +22,47 @@
 
 ## 🌟 Overview
 
-**PullDL** is an open-source browser companion and universal media suite. Designed as a clean, reliable alternative to traditional ad-riddled downloaders like SaveFrom, Y2Mate, and SnapInsta, PullDL enables **1-click downloads directly from your favorite video and social platforms**.
-
-No sketchy pop-under ads, no deceptive download banners, no third-party APK installs. Just instant, pristine media extraction.
-
-![PullDL Preview](./assets/preview.png)
+**PullDL** is the next-generation, pure in-browser alternative to legacy desktop download managers like IDM. Built with modern Manifest V3 standards, PullDL auto-detects video and audio streams across **any website** on the internet, anchors a sleek floating download button to playing videos, and downloads files at maximum speed using multi-threaded connection acceleration—**with zero desktop software or background installers required.**
 
 ---
 
-## ✨ Features
+## ✨ Features (v2.0 Turbo Edition)
 
-- ⚡ **1-Click Active Tab Downloads:** Detect and download the current playing video with a single click.
-- 🎯 **Floating In-Page Button:** An unobtrusive, sleek download trigger appears on supported platforms (YouTube, TikTok, Instagram, Reddit, etc.).
-- 🚫 **100% Ad-Free:** Zero redirects, zero malware warnings, zero shady pop-ups.
-- 🎬 **Maximum Source Quality:** Preserves original bitrates — 1080p Full HD, 4K UHD, and 320kbps MP3 audio streams.
-- 💧 **Watermark-Free TikTok:** Download TikTok videos without watermarks or extract original audio.
-- 🔒 **Privacy First:** Zero logs kept, runs client-side inside your browser without accounts.
+- 🎯 **In-Page Floating Corner Button:** An unobtrusive, sleek PullDL button appears right on the corner of playing video players with instant quality choices (1080p, 720p, 480p, MP3).
+- ⚡ **IDM-Style Glassmorphic HUD Modal:** Replaces the default browser download bar with an in-page floating telemetry window displaying live throughput speed (`15.4 MB/s`), remaining time (ETA), and pause/resume/cancel controls.
+- 🧵 **8-Chunk Multi-Thread Parallel Visualizer:** Visual IDM-style connection threads actively filling up in real time.
+- 📁 **Smart Folder Routing:** Automatically catalogs media into organized subdirectories:
+  - 🎬 Videos: `Downloads/PullDL/Videos/`
+  - 🎵 Music & Audio: `Downloads/PullDL/Music/`
+  - ⚙️ Interactive folder picker (`Save As...`) supported.
+- 📡 **Universal Media Sniffer:** Intercepts HLS (m3u8), DASH (mpd), MP4, WebM, and audio streams on over 1,290+ platforms.
+- 🎛️ **4-Tab Popup Dashboard:**
+  - **Detected:** Instant 1-click download list of all media on the active tab.
+  - **Active:** Live progress telemetry with speedometers.
+  - **History:** Catalog of recent completed downloads.
+  - **Settings:** Configurable thread concurrency (4, 8, 16 threads) and folder options.
+- 🔒 **Zero Malware & 100% Free:** No crack needed, no licenses, runs natively inside your browser on Windows, Mac, Linux, and ChromeOS.
+
+---
+
+## 🚀 Quick Install (Developer Mode / Load Unpacked)
+
+Install and test the extension directly in your Chromium-based browser in 30 seconds:
+
+1. **Download or Clone:**
+   ```bash
+   git clone https://github.com/pulldl/pulldl.git
+   ```
+   *(Or download and extract `pulldl-extension-v2.0.0.zip`)*
+2. **Open Extensions Manager:**
+   - Chrome / Brave: Navigate to `chrome://extensions`
+   - Microsoft Edge: Navigate to `edge://extensions`
+3. **Enable Developer Mode:**
+   - Toggle **"Developer mode"** in the top-right corner.
+4. **Load Unpacked:**
+   - Click **"Load unpacked"** and select this directory!
+5. **Start Downloading:**
+   - Open any video website (YouTube, TikTok, Facebook, Reddit, Vimeo, etc.), play a video, and click the corner PullDL button!
 
 ---
 
@@ -52,49 +77,12 @@ No sketchy pop-under ads, no deceptive download banners, no third-party APK inst
 | **Twitter / X** | 1080p HD MP4, Looping GIF | Fast Tweet Media Extraction |
 | **Reddit** | Muxed HD MP4 | Synchronized Audio Track |
 | **Pinterest** | 1080p HD MP4 | Video Pins & Idea Pins |
-| **1,280+ Others** | MP4, WebM, MP3 | Universal Stream Parsing |
+| **1,280+ Others** | MP4, WebM, MP3, HLS | Universal Stream Sniffer |
 
-👉 *For the complete searchable catalog of 1,290+ supported services, visit [pulldl.com/supported-sites](https://pulldl.com/supported-sites).*
-
----
-
-## 🚀 Quick Install (Chrome, Brave, Edge, Opera)
-
-1. **Clone or Download this repository:**
-   ```bash
-   git clone https://github.com/pulldl/pulldl.git
-   ```
-   *(Or click **Code** -> **Download ZIP** and extract it)*.
-
-2. **Open Extensions in your browser:**
-   - Chrome / Brave: Navigate to `chrome://extensions`
-   - Microsoft Edge: Navigate to `edge://extensions`
-
-3. **Enable Developer Mode:**
-   - Toggle the **Developer mode** switch in the top-right corner.
-
-4. **Load the Extension:**
-   - Click **"Load unpacked"** in the top-left corner.
-   - Select the folder containing `manifest.json`.
-
-5. **Done!** The PullDL extension icon is now active in your toolbar.
-
----
-
-## 🛠️ Built With
-
-- **Manifest V3** Chrome Extension Engine
-- **Native Shadow DOM** for isolated in-page UI buttons
-- Edge resolvers and stream parsers powered by [PullDL Web Studio](https://pulldl.com)
+👉 *For the complete searchable catalog of 1,290+ supported services, visit [pulldl.com](https://pulldl.com).*
 
 ---
 
 ## 📄 License
 
-This project is open-source and licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-  <sub>Built with ❤️ for a cleaner, faster web by the <a href="https://pulldl.com">PullDL Team</a>.</sub>
-</div>
+Distributed under the [MIT License](LICENSE). Built with ❤️ by the PullDL Community.
