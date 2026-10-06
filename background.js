@@ -1,5 +1,5 @@
-// PullDL Background Service Worker (Turbo Edition v2.1)
-// Architecture: Universal Stream Sniffer + High-Speed Extraction Resolver + Real-time Telemetry
+// PullDL Background Service Worker (Universal Studio Engine v3.0.0)
+// Implements: 7-Layer Media Registry, Adaptive Segmentation, JDownloader Batch LinkGrabber, Smart Folder Routing
 
 const tabMediaMap = new Map(); // tabId -> Array of Media objects
 const activeDownloadsMap = new Map(); // downloadId -> Telemetry state
@@ -8,12 +8,12 @@ const downloadHistory = []; // Recent completed downloads
 const DEFAULT_SETTINGS = {
   askFolder: false,
   smartSorting: true,
-  parallelChunks: 8,
+  concurrencyMode: "adaptive", // adaptive, 4, 8, 16
   floatingButton: true,
   autoSniff: true
 };
 
-// Initialize settings
+// Initialize settings & Context Menu
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(DEFAULT_SETTINGS, (stored) => {
     chrome.storage.local.set(stored);
@@ -24,9 +24,30 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "⚡ Download with PullDL Turbo",
     contexts: ["page", "link", "video", "audio"]
   });
+
+  chrome.contextMenus.create({
+    id: "pulldl-grab-links",
+    title: "📋 Grab all links on page (PullDL LinkGrabber)",
+    contexts: ["page", "selection"]
+  });
 });
 
-// Helper: Clean filename
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "pulldl-download-turbo") {
+    const targetUrl = info.srcUrl || info.linkUrl || tab?.url;
+    if (targetUrl && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
+      initiateDownload({
+        url: targetUrl,
+        title: tab?.title || "Media_File",
+        tabId: tab?.id,
+        category: info.mediaType === "audio" ? "audio" : "video"
+      });
+    }
+  } else if (info.menuItemId === "pulldl-grab-links") {
+    chrome.tabs.sendMessage(tab.id, { type: "TRIGGER_PAGE_LINKGRAB" }).catch(() => {});
+  }
+});
+
 function sanitizeFilename(name, fallbackExt = "mp4") {
   if (!name) return "PullDL_Media_" + Date.now() + "." + fallbackExt;
   let clean = name
@@ -40,14 +61,14 @@ function sanitizeFilename(name, fallbackExt = "mp4") {
   return clean;
 }
 
-// 1. API Stream Resolver (For YouTube, Facebook, TikTok, Instagram, Twitter/X, Reddit, etc.)
+// 1. API Stream Resolver (YouTube, Facebook, TikTok, Instagram, Twitter/X, Reddit)
 async function resolveMediaFormatsViaApi(pageUrl) {
   try {
     const response = await fetch("https://pulldl.com/api/extract", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "PullDL-Browser-Extension-Turbo/2.1"
+        "User-Agent": "PullDL-Universal-Extension/3.0.0"
       },
       body: JSON.stringify({ url: pageUrl })
     });
@@ -67,7 +88,7 @@ async function resolveMediaFormatsViaApi(pageUrl) {
   }
 }
 
-// 2. Direct Network Media Sniffer (for random websites with standalone video/audio files)
+// 2. Layer 4: WebRequest Stream Sniffer
 const MEDIA_MIME_TYPES = [
   "video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-matroska",
   "application/vnd.apple.mpegurl", "application/x-mpegurl", "application/dash+xml",
@@ -81,7 +102,6 @@ chrome.webRequest.onHeadersReceived.addListener(
     if (details.tabId < 0) return;
     const url = details.url;
 
-    // Ignore telemetry and ads
     if (url.includes("google-analytics.com") || url.includes("doubleclick.net") || url.includes("/telemetry/")) return;
 
     let mimeType = "";
@@ -148,7 +168,7 @@ function registerDetectedMedia(tabId, mediaItem) {
 
 chrome.tabs.onRemoved.addListener((tabId) => tabMediaMap.delete(tabId));
 
-// 3. Initiate High-Speed Download with Smart Folder Routing
+// 3. Initiate High-Speed Download with Adaptive Segmentation
 async function initiateDownload({ url, title, tabId, category = "video", ext = "mp4", saveAs = false }) {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
   const cleanFilename = sanitizeFilename(title, ext);
@@ -212,7 +232,7 @@ async function initiateDownload({ url, title, tabId, category = "video", ext = "
   }
 }
 
-// 4. Real-time Telemetry & Speed Calculations
+// 4. Real-time Telemetry
 chrome.downloads.onChanged.addListener((delta) => {
   const item = activeDownloadsMap.get(delta.id);
   if (!item) return;
@@ -279,7 +299,30 @@ chrome.downloads.onChanged.addListener((delta) => {
   }
 });
 
-// 5. Message Handling
+// 5. Smart LinkGrabber (JDownloader Style Batch URL Extractor)
+function parseLinksFromText(rawText) {
+  const urlRegex = /https?:\/\/[^\s"'<>()[\]{}]+/gi;
+  const matches = rawText.match(urlRegex) || [];
+  const uniqueUrls = Array.from(new Set(matches));
+
+  return uniqueUrls.map((u) => {
+    const cleanUrl = u.replace(/[.,;!]+$/, "");
+    let category = "file";
+    if (/\.(mp4|webm|mkv|mov|flv|m4v)/i.test(cleanUrl)) category = "video";
+    else if (/\.(mp3|wav|flac|aac|m4a|ogg)/i.test(cleanUrl)) category = "audio";
+    else if (/\.(jpg|jpeg|png|webp|gif)/i.test(cleanUrl)) category = "image";
+    else if (/\.(zip|rar|7z|tar|gz)/i.test(cleanUrl)) category = "archive";
+    else if (/youtube\.com|youtu\.be|facebook\.com|tiktok\.com|instagram\.com/i.test(cleanUrl)) category = "video";
+
+    return {
+      url: cleanUrl,
+      category: category,
+      domain: new URL(cleanUrl).hostname
+    };
+  });
+}
+
+// 6. Message Dispatcher
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender?.tab?.id || message.tabId;
 
@@ -290,12 +333,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
     }
 
+    case "DOM_MEDIA_FOUND": {
+      if (message.media && tabId) {
+        registerDetectedMedia(tabId, message.media);
+      }
+      sendResponse({ success: true });
+      break;
+    }
+
     case "RESOLVE_PLATFORM_FORMATS": {
-      // Calls PullDL API for YouTube, Facebook, TikTok, Instagram, Twitter, etc.
       resolveMediaFormatsViaApi(message.pageUrl)
         .then((data) => sendResponse({ success: true, data }))
         .catch((err) => sendResponse({ success: false, error: err.message }));
-      return true; // async
+      return true;
     }
 
     case "TRIGGER_DOWNLOAD": {
@@ -312,6 +362,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: err.message });
       });
       return true;
+    }
+
+    case "TRIGGER_BATCH_DOWNLOAD": {
+      const items = message.items || [];
+      let dispatched = 0;
+      items.forEach((item, index) => {
+        setTimeout(() => {
+          initiateDownload({
+            url: item.url,
+            title: item.title || `Batch_Item_${index + 1}`,
+            category: item.category || "video",
+            ext: item.ext || "mp4"
+          }).catch(() => {});
+        }, index * 400); // 400ms stagger
+        dispatched++;
+      });
+      sendResponse({ success: true, count: dispatched });
+      break;
+    }
+
+    case "PARSE_BATCH_TEXT": {
+      const parsed = parseLinksFromText(message.rawText || "");
+      sendResponse({ success: true, items: parsed });
+      break;
     }
 
     case "PAUSE_DOWNLOAD": {

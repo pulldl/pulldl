@@ -1,7 +1,8 @@
-// PullDL Popup Executive Dashboard Logic (v2.1 Turbo)
+// PullDL Universal Studio Popup Logic (v3.0.0 Obsidian Glass Edition)
+// Implements: 7-Layer Media View, JDownloader Batch LinkGrabber, Real-Time Speedometer HUD, Telemetry Controls
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // Navigation Tabs
+  // 1. Navigation Tab Switching
   const tabs = document.querySelectorAll(".nav-tab");
   const panes = document.querySelectorAll(".tab-pane");
 
@@ -25,20 +26,35 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function formatSpeed(bytesPerSec) {
-    if (!bytesPerSec || bytesPerSec === 0) return "0 KB/s";
+    if (!bytesPerSec || bytesPerSec === 0) return { val: "0.0", unit: "KB/s" };
     if (bytesPerSec > 1024 * 1024) {
-      return (bytesPerSec / (1024 * 1024)).toFixed(1) + " MB/s";
+      return { val: (bytesPerSec / (1024 * 1024)).toFixed(1), unit: "MB/s" };
     }
-    return Math.round(bytesPerSec / 1024) + " KB/s";
+    return { val: Math.round(bytesPerSec / 1024).toString(), unit: "KB/s" };
   }
 
-  // 1. Load Detected Media or Resolve via API
+  // Active Tab Metadata
   const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const activeTabTitleEl = document.getElementById("active-tab-title");
+  if (activeTab && activeTabTitleEl) {
+    activeTabTitleEl.textContent = activeTab.title || activeTab.url;
+    activeTabTitleEl.title = activeTab.url;
+  }
+
+  // ================= TAB 1: DETECTED STREAMS =================
   const listContainer = document.getElementById("detected-list");
   const emptyContainer = document.getElementById("detected-empty");
   const countBadge = document.getElementById("badge-detected-count");
+  const searchInput = document.getElementById("detected-search");
+  const actionBar = document.getElementById("detected-action-bar");
+  const batchBtn = document.getElementById("btn-download-all-detected");
+  const refreshBtn = document.getElementById("btn-refresh-streams");
 
-  if (activeTab) {
+  let currentDetectedItems = [];
+
+  async function loadDetectedStreams() {
+    if (!activeTab) return;
+
     const isPlatform =
       activeTab.url.includes("youtube.com") ||
       activeTab.url.includes("youtu.be") ||
@@ -51,22 +67,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       activeTab.url.includes("reddit.com");
 
     if (isPlatform) {
-      emptyContainer.innerHTML = `
-        <div class="radar-scan"></div>
-        <h3>Resolving ${activeTab.title.substring(0, 30)}...</h3>
-        <p>Fetching ultra high-bitrate media streams from PullDL Cloud Engine.</p>
-      `;
+      emptyContainer.style.display = "flex";
+      listContainer.style.display = "none";
+      actionBar.style.display = "none";
 
-      chrome.runtime.sendMessage({
-        type: "RESOLVE_PLATFORM_FORMATS",
-        pageUrl: activeTab.url
-      }, (resp) => {
-        if (resp && resp.success && resp.data && resp.data.formats && resp.data.formats.length > 0) {
-          renderPlatformFormats(resp.data);
-        } else {
-          checkSniffedMedia();
+      document.getElementById("empty-state-title").textContent = "Resolving Cloud Streams...";
+      document.getElementById("empty-state-desc").textContent = "Accessing PullDL Multi-Gigabit extraction pipeline for highest bitrate media...";
+
+      chrome.runtime.sendMessage(
+        { type: "RESOLVE_PLATFORM_FORMATS", pageUrl: activeTab.url },
+        (resp) => {
+          if (resp && resp.success && resp.data && resp.data.formats && resp.data.formats.length > 0) {
+            renderPlatformFormats(resp.data);
+          } else {
+            checkSniffedMedia();
+          }
         }
-      });
+      );
     } else {
       checkSniffedMedia();
     }
@@ -75,68 +92,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   function checkSniffedMedia() {
     chrome.runtime.sendMessage({ type: "GET_TAB_MEDIA", tabId: activeTab.id }, (response) => {
       const mediaList = response?.media || [];
+      currentDetectedItems = mediaList;
       countBadge.textContent = mediaList.length;
 
       if (mediaList.length > 0) {
-        listContainer.style.display = "flex";
-        emptyContainer.style.display = "none";
-        listContainer.innerHTML = "";
-
-        mediaList.forEach((item) => {
-          const card = document.createElement("div");
-          card.className = "media-card";
-
-          const isAudio = item.format === "MP3" || item.mimeType.includes("audio");
-
-          card.innerHTML = `
-            <div class="media-header">
-              <span class="media-badge ${isAudio ? "audio" : ""}">${item.format}</span>
-              <span class="media-size">${formatBytes(item.size)}</span>
-            </div>
-            <div class="media-title" title="${activeTab.title || item.url}">
-              ${activeTab.title || "Web Video Stream"}
-            </div>
-            <div class="media-actions">
-              <button class="btn-download-primary" data-url="${item.url}" data-ext="${isAudio ? "mp3" : "mp4"}">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Download Turbo
-              </button>
-              <button class="btn-download-sec" data-url="${item.url}" data-saveas="true">
-                Save As...
-              </button>
-            </div>
-          `;
-
-          card.querySelector(".btn-download-primary").addEventListener("click", () => {
-            chrome.runtime.sendMessage({
-              type: "TRIGGER_DOWNLOAD",
-              url: item.url,
-              title: activeTab.title,
-              tabId: activeTab.id,
-              ext: isAudio ? "mp3" : "mp4",
-              category: isAudio ? "audio" : "video"
-            });
-            document.querySelector('[data-tab="tab-active"]').click();
-          });
-
-          card.querySelector(".btn-download-sec").addEventListener("click", () => {
-            chrome.runtime.sendMessage({
-              type: "TRIGGER_DOWNLOAD",
-              url: item.url,
-              title: activeTab.title,
-              tabId: activeTab.id,
-              ext: isAudio ? "mp3" : "mp4",
-              category: isAudio ? "audio" : "video",
-              saveAs: true
-            });
-            document.querySelector('[data-tab="tab-active"]').click();
-          });
-
-          listContainer.appendChild(card);
-        });
+        actionBar.style.display = "flex";
+        renderMediaList(mediaList);
       } else {
         listContainer.style.display = "none";
+        actionBar.style.display = "none";
         emptyContainer.style.display = "flex";
+        document.getElementById("empty-state-title").textContent = "Sniffing Media Streams...";
+        document.getElementById("empty-state-desc").textContent = "Play any video or audio on the page. The 7-layer engine will capture 4K/1080p and HLS streams automatically.";
       }
     });
   }
@@ -144,11 +111,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   function renderPlatformFormats(data) {
     const title = data.title || activeTab.title;
     const formats = data.formats || [];
-
-    countBadge.textContent = formats.length;
-    listContainer.style.display = "flex";
-    emptyContainer.style.display = "none";
-    listContainer.innerHTML = "";
 
     // Deduplicate
     const unique = [];
@@ -161,48 +123,77 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    unique.slice(0, 8).forEach((f) => {
+    currentDetectedItems = unique.map((f) => ({
+      url: f.url,
+      title: title,
+      format: (f.quality || f.ext || "MP4").toUpperCase(),
+      ext: f.ext || "mp4",
+      size: f.filesize || 0,
+      isAudio: f.ext === "mp3" || (f.quality && f.quality.toLowerCase().includes("audio"))
+    }));
+
+    countBadge.textContent = currentDetectedItems.length;
+    actionBar.style.display = "flex";
+    renderMediaList(currentDetectedItems);
+  }
+
+  function renderMediaList(items) {
+    listContainer.innerHTML = "";
+    listContainer.style.display = "flex";
+    emptyContainer.style.display = "none";
+
+    items.forEach((item) => {
       const card = document.createElement("div");
       card.className = "media-card";
 
-      const isAudio = f.ext === "mp3" || (f.quality && f.quality.toLowerCase().includes("audio"));
+      const isAudio = item.isAudio || item.format === "MP3" || (item.mimeType && item.mimeType.includes("audio"));
+      const isStream = item.format && (item.format.includes("HLS") || item.format.includes("DASH"));
+
+      let badgeClass = "media-badge";
+      if (isAudio) badgeClass += " audio";
+      else if (isStream) badgeClass += " stream";
 
       card.innerHTML = `
         <div class="media-header">
-          <span class="media-badge ${isAudio ? "audio" : ""}">${f.quality || (f.ext || "MP4").toUpperCase()}</span>
-          <span class="media-size">${formatBytes(f.filesize)}</span>
+          <div class="badge-row">
+            <span class="${badgeClass}">${item.format || "MP4"}</span>
+            ${item.confidence ? `<span class="confidence-pill">${Math.round(item.confidence * 100)}% match</span>` : ""}
+          </div>
+          <span class="media-size">${formatBytes(item.size)}</span>
         </div>
-        <div class="media-title" title="${title}">${title}</div>
+        <div class="media-title" title="${item.title || activeTab.title || item.url}">
+          ${item.title || activeTab.title || "Web Media Stream"}
+        </div>
         <div class="media-actions">
-          <button class="btn-download-primary btn-dl-format" data-url="${f.url}" data-ext="${f.ext || "mp4"}">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Download ${f.quality || "Turbo"}
+          <button class="btn-download-primary btn-dl-now">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span>Download Turbo</span>
           </button>
-          <button class="btn-download-sec btn-saveas-format" data-url="${f.url}" data-ext="${f.ext || "mp4"}">
+          <button class="btn-download-sec btn-saveas-now">
             Save As...
           </button>
         </div>
       `;
 
-      card.querySelector(".btn-dl-format").addEventListener("click", () => {
+      card.querySelector(".btn-dl-now").addEventListener("click", () => {
         chrome.runtime.sendMessage({
           type: "TRIGGER_DOWNLOAD",
-          url: f.url,
-          title: title,
+          url: item.url,
+          title: item.title || activeTab.title,
           tabId: activeTab.id,
-          ext: f.ext || "mp4",
+          ext: isAudio ? "mp3" : (item.ext || "mp4"),
           category: isAudio ? "audio" : "video"
         });
         document.querySelector('[data-tab="tab-active"]').click();
       });
 
-      card.querySelector(".btn-saveas-format").addEventListener("click", () => {
+      card.querySelector(".btn-saveas-now").addEventListener("click", () => {
         chrome.runtime.sendMessage({
           type: "TRIGGER_DOWNLOAD",
-          url: f.url,
-          title: title,
+          url: item.url,
+          title: item.title || activeTab.title,
           tabId: activeTab.id,
-          ext: f.ext || "mp4",
+          ext: isAudio ? "mp3" : (item.ext || "mp4"),
           category: isAudio ? "audio" : "video",
           saveAs: true
         });
@@ -213,15 +204,253 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // 2. Active Downloads & History Poller
-  function updateDownloadsAndHistory() {
+  // Search filter
+  searchInput?.addEventListener("input", (e) => {
+    const query = e.target.value.toLowerCase().trim();
+    if (!query) {
+      renderMediaList(currentDetectedItems);
+      return;
+    }
+    const filtered = currentDetectedItems.filter(
+      (item) =>
+        (item.format && item.format.toLowerCase().includes(query)) ||
+        (item.title && item.title.toLowerCase().includes(query)) ||
+        (item.ext && item.ext.toLowerCase().includes(query))
+    );
+    renderMediaList(filtered);
+  });
+
+  // Batch Download All Detected
+  batchBtn?.addEventListener("click", () => {
+    if (currentDetectedItems.length === 0) return;
+    const batchItems = currentDetectedItems.map((item) => ({
+      url: item.url,
+      title: item.title || activeTab.title,
+      category: item.isAudio ? "audio" : "video",
+      ext: item.isAudio ? "mp3" : (item.ext || "mp4")
+    }));
+
+    chrome.runtime.sendMessage({
+      type: "TRIGGER_BATCH_DOWNLOAD",
+      items: batchItems
+    }, () => {
+      document.querySelector('[data-tab="tab-active"]').click();
+    });
+  });
+
+  refreshBtn?.addEventListener("click", () => {
+    loadDetectedStreams();
+  });
+
+  loadDetectedStreams();
+
+  // ================= TAB 2: LINKGRABBER (JDownloader Style) =================
+  const btnScrapePage = document.getElementById("btn-scrape-page");
+  const btnPasteClipboard = document.getElementById("btn-paste-clipboard");
+  const grabberInput = document.getElementById("grabber-input");
+  const btnParse = document.getElementById("btn-parse-links");
+  const grabberChipsBar = document.getElementById("grabber-chips-bar");
+  const grabberSelectRow = document.getElementById("grabber-select-row");
+  const grabberListEl = document.getElementById("grabber-list");
+  const grabberEmpty = document.getElementById("grabber-empty");
+  const grabberFooterAction = document.getElementById("grabber-footer-action");
+  const grabberToggleAll = document.getElementById("grabber-toggle-all");
+  const grabberSelectionCount = document.getElementById("grabber-selection-count");
+  const btnDownloadSelected = document.getElementById("btn-download-selected-grab");
+  const btnDownloadSelectedText = document.getElementById("btn-download-selected-text");
+  const badgeGrabberCount = document.getElementById("badge-grabber-count");
+
+  let allGrabbedItems = [];
+  let currentFilterCategory = "all";
+
+  function populateGrabber(items) {
+    allGrabbedItems = items.map((item, idx) => ({
+      ...item,
+      id: "grab_" + idx,
+      selected: true
+    }));
+
+    updateGrabberUI();
+  }
+
+  function updateGrabberUI() {
+    if (allGrabbedItems.length === 0) {
+      grabberEmpty.style.display = "flex";
+      grabberChipsBar.style.display = "none";
+      grabberSelectRow.style.display = "none";
+      grabberListEl.style.display = "none";
+      grabberFooterAction.style.display = "none";
+      badgeGrabberCount.style.display = "none";
+      return;
+    }
+
+    grabberEmpty.style.display = "none";
+    grabberChipsBar.style.display = "flex";
+    grabberSelectRow.style.display = "flex";
+    grabberListEl.style.display = "flex";
+    grabberFooterAction.style.display = "flex";
+
+    badgeGrabberCount.style.display = "inline-block";
+    badgeGrabberCount.textContent = allGrabbedItems.length;
+
+    // Update Counts on Filter Chips
+    const countAll = allGrabbedItems.length;
+    const countVideo = allGrabbedItems.filter((i) => i.category === "video").length;
+    const countAudio = allGrabbedItems.filter((i) => i.category === "audio").length;
+    const countImage = allGrabbedItems.filter((i) => i.category === "image").length;
+    const countArchive = allGrabbedItems.filter((i) => i.category === "archive").length;
+
+    document.getElementById("chip-count-all").textContent = countAll;
+    document.getElementById("chip-count-video").textContent = countVideo;
+    document.getElementById("chip-count-audio").textContent = countAudio;
+    document.getElementById("chip-count-image").textContent = countImage;
+    document.getElementById("chip-count-archive").textContent = countArchive;
+
+    renderFilteredGrabberList();
+  }
+
+  function renderFilteredGrabberList() {
+    grabberListEl.innerHTML = "";
+
+    const visibleItems = currentFilterCategory === "all"
+      ? allGrabbedItems
+      : allGrabbedItems.filter((i) => i.category === currentFilterCategory);
+
+    visibleItems.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "grabber-item-card";
+
+      card.innerHTML = `
+        <input type="checkbox" ${item.selected ? "checked" : ""} data-id="${item.id}">
+        <div class="grabber-item-info">
+          <div class="grabber-item-title" title="${item.url}">${item.title || item.url}</div>
+          <div class="grabber-item-meta">
+            <span class="grabber-cat-badge">${item.category}</span>
+            <span>${item.domain || "web"}</span>
+          </div>
+        </div>
+      `;
+
+      card.querySelector('input[type="checkbox"]').addEventListener("change", (e) => {
+        item.selected = e.target.checked;
+        updateSelectionStatus();
+      });
+
+      grabberListEl.appendChild(card);
+    });
+
+    updateSelectionStatus();
+  }
+
+  function updateSelectionStatus() {
+    const selectedCount = allGrabbedItems.filter((i) => i.selected).length;
+    grabberSelectionCount.textContent = `${selectedCount} of ${allGrabbedItems.length} selected`;
+    btnDownloadSelectedText.textContent = `⚡ Start Batch Download (${selectedCount} items)`;
+    btnDownloadSelected.disabled = selectedCount === 0;
+
+    grabberToggleAll.checked = selectedCount === allGrabbedItems.length && allGrabbedItems.length > 0;
+  }
+
+  // Filter Chip Click
+  document.querySelectorAll(".filter-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".filter-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      currentFilterCategory = chip.getAttribute("data-category");
+      renderFilteredGrabberList();
+    });
+  });
+
+  // Select All Toggle
+  grabberToggleAll?.addEventListener("change", (e) => {
+    const checked = e.target.checked;
+    const targetItems = currentFilterCategory === "all"
+      ? allGrabbedItems
+      : allGrabbedItems.filter((i) => i.category === currentFilterCategory);
+
+    targetItems.forEach((i) => (i.selected = checked));
+    renderFilteredGrabberList();
+  });
+
+  // Scrape Page Links
+  btnScrapePage?.addEventListener("click", () => {
+    btnScrapePage.textContent = "Scraping...";
+    chrome.tabs.sendMessage(activeTab.id, { type: "SCRAPE_PAGE_LINKS" }, (response) => {
+      btnScrapePage.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <span>Scrape Current Page</span>
+      `;
+      if (response && response.links && response.links.length > 0) {
+        populateGrabber(response.links);
+      } else {
+        // Fallback: parse page HTML via text parser
+        chrome.runtime.sendMessage({
+          type: "PARSE_BATCH_TEXT",
+          rawText: activeTab.url
+        }, (res) => {
+          if (res?.items) populateGrabber(res.items);
+        });
+      }
+    });
+  });
+
+  // Paste Clipboard
+  btnPasteClipboard?.addEventListener("click", async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        grabberInput.value = text;
+        chrome.runtime.sendMessage({ type: "PARSE_BATCH_TEXT", rawText: text }, (res) => {
+          if (res?.items) populateGrabber(res.items);
+        });
+      }
+    } catch (e) {
+      grabberInput.focus();
+    }
+  });
+
+  // Manual Parse Button
+  btnParse?.addEventListener("click", () => {
+    const text = grabberInput.value.trim();
+    if (text) {
+      chrome.runtime.sendMessage({ type: "PARSE_BATCH_TEXT", rawText: text }, (res) => {
+        if (res?.items) populateGrabber(res.items);
+      });
+    }
+  });
+
+  // Execute Batch Download
+  btnDownloadSelected?.addEventListener("click", () => {
+    const selected = allGrabbedItems.filter((i) => i.selected);
+    if (selected.length === 0) return;
+
+    chrome.runtime.sendMessage({
+      type: "TRIGGER_BATCH_DOWNLOAD",
+      items: selected
+    }, () => {
+      document.querySelector('[data-tab="tab-active"]').click();
+    });
+  });
+
+  // ================= TAB 3: ACTIVE DOWNLOADS & SPEEDOMETER =================
+  const activeListContainer = document.getElementById("active-list");
+  const activeEmptyContainer = document.getElementById("active-empty");
+  const activeBadge = document.getElementById("badge-active-count");
+  const speedoOverview = document.getElementById("speedo-overview");
+  const hudTotalSpeed = document.getElementById("hud-total-speed");
+  const hudTotalUnit = document.getElementById("hud-total-unit");
+  const hudThreadsText = document.getElementById("hud-threads-text");
+
+  function updateActiveAndHistory() {
     chrome.runtime.sendMessage({ type: "GET_ACTIVE_DOWNLOADS" }, (response) => {
       if (!response) return;
 
-      const activeList = response.activeDownloads?.filter((d) => d.state === "in_progress" || d.state === "paused") || [];
+      const activeList = response.activeDownloads?.filter(
+        (d) => d.state === "in_progress" || d.state === "paused"
+      ) || [];
       const historyList = response.history || [];
 
-      const activeBadge = document.getElementById("badge-active-count");
+      // Update badge
       if (activeList.length > 0) {
         activeBadge.style.display = "inline-block";
         activeBadge.textContent = activeList.length;
@@ -229,42 +458,74 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeBadge.style.display = "none";
       }
 
-      const activeContainer = document.getElementById("active-list");
-      const activeEmpty = document.getElementById("active-empty");
+      // Calculate aggregated speed
+      let totalSpeedBytes = 0;
+      activeList.forEach((d) => {
+        if (d.speed) totalSpeedBytes += d.speed;
+      });
+
+      const sp = formatSpeed(totalSpeedBytes);
+      hudTotalSpeed.textContent = sp.val;
+      hudTotalUnit.textContent = sp.unit;
 
       if (activeList.length > 0) {
-        activeContainer.style.display = "flex";
-        activeEmpty.style.display = "none";
-        activeContainer.innerHTML = "";
+        speedoOverview.style.display = "flex";
+        activeListContainer.style.display = "flex";
+        activeEmptyContainer.style.display = "none";
+        activeListContainer.innerHTML = "";
 
         activeList.forEach((item) => {
           const card = document.createElement("div");
           card.className = "active-download-card";
 
+          const itemSpeed = formatSpeed(item.speed);
+          const isPaused = item.state === "paused";
+
           card.innerHTML = `
             <div class="media-title" title="${item.title}">${item.title}</div>
             <div class="download-stat-row">
-              <span class="stat-speed">⚡ ${formatSpeed(item.speed)}</span>
+              <span class="stat-speed">⚡ ${itemSpeed.val} ${itemSpeed.unit}</span>
               <span class="stat-progress-val">${formatBytes(item.receivedBytes)} / ${formatBytes(item.totalBytes)} (${item.progress}%)</span>
             </div>
             <div class="card-progress-track">
               <div class="card-progress-fill" style="width: ${item.progress}%"></div>
             </div>
+            <div class="active-card-actions">
+              <button class="btn-ctrl btn-toggle-pause">${isPaused ? "Resume ▶" : "Pause ⏸"}</button>
+              <button class="btn-ctrl btn-cancel-item">Cancel ✕</button>
+            </div>
           `;
-          activeContainer.appendChild(card);
+
+          card.querySelector(".btn-toggle-pause").addEventListener("click", () => {
+            if (isPaused) {
+              chrome.runtime.sendMessage({ type: "RESUME_DOWNLOAD", downloadId: item.downloadId });
+            } else {
+              chrome.runtime.sendMessage({ type: "PAUSE_DOWNLOAD", downloadId: item.downloadId });
+            }
+          });
+
+          card.querySelector(".btn-cancel-item").addEventListener("click", () => {
+            chrome.runtime.sendMessage({ type: "CANCEL_DOWNLOAD", downloadId: item.downloadId });
+          });
+
+          activeListContainer.appendChild(card);
         });
       } else {
-        activeContainer.style.display = "none";
-        activeEmpty.style.display = "flex";
+        speedoOverview.style.display = "none";
+        activeListContainer.style.display = "none";
+        activeEmptyContainer.style.display = "flex";
       }
 
-      const historyContainer = document.getElementById("history-list");
-      const historyEmpty = document.getElementById("history-empty");
+      // TAB 4: HISTORY
+      const historyListContainer = document.getElementById("history-list");
+      const historyEmptyContainer = document.getElementById("history-empty");
+      const historyTopBar = document.getElementById("history-top-bar");
 
       if (historyList.length > 0) {
-        historyContainer.style.display = "flex";
-        historyEmpty.style.display = "none";
-        historyContainer.innerHTML = "";
+        historyTopBar.style.display = "flex";
+        historyListContainer.style.display = "flex";
+        historyEmptyContainer.style.display = "none";
+        historyListContainer.innerHTML = "";
 
         historyList.forEach((item) => {
           const card = document.createElement("div");
@@ -277,8 +538,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             </div>
             <div class="media-title" title="${item.title}">${item.title}</div>
             <div class="media-actions">
-              <button class="btn-download-sec btn-open-file" style="flex: 1;">Open File</button>
-              <button class="btn-download-sec btn-show-folder">Folder</button>
+              <button class="btn-download-sec btn-open-file" style="flex: 2;">Open File</button>
+              <button class="btn-download-sec btn-show-folder" style="flex: 1;">Folder</button>
             </div>
           `;
 
@@ -289,20 +550,29 @@ document.addEventListener("DOMContentLoaded", async () => {
             chrome.runtime.sendMessage({ type: "SHOW_IN_FOLDER", downloadId: item.id });
           });
 
-          historyContainer.appendChild(card);
+          historyListContainer.appendChild(card);
         });
       } else {
-        historyContainer.style.display = "none";
-        historyEmpty.style.display = "flex";
+        historyTopBar.style.display = "none";
+        historyListContainer.style.display = "none";
+        historyEmptyContainer.style.display = "flex";
       }
     });
   }
 
-  updateDownloadsAndHistory();
-  const pollInterval = setInterval(updateDownloadsAndHistory, 1000);
-  window.addEventListener("unload", () => clearInterval(pollInterval));
+  updateActiveAndHistory();
+  const pollTimer = setInterval(updateActiveAndHistory, 700);
+  window.addEventListener("unload", () => clearInterval(pollTimer));
 
-  // 3. Settings Synchronization
+  // Clear History
+  document.getElementById("btn-clear-history")?.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "GET_ACTIVE_DOWNLOADS" }, (res) => {
+      if (res?.history) res.history.length = 0;
+      updateActiveAndHistory();
+    });
+  });
+
+  // ================= TAB 5: SETTINGS =================
   const settingThreads = document.getElementById("setting-threads");
   const settingSorting = document.getElementById("setting-sorting");
   const settingAskFolder = document.getElementById("setting-ask-folder");
@@ -318,17 +588,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     settingSorting.checked = data.smartSorting;
     settingAskFolder.checked = data.askFolder;
     settingFloatingBtn.checked = data.floatingButton;
+
+    hudThreadsText.textContent = `${data.parallelChunks} Threads Segmented`;
   });
 
   settingThreads.addEventListener("change", () => {
-    chrome.storage.local.set({ parallelChunks: parseInt(settingThreads.value, 10) });
+    const val = parseInt(settingThreads.value, 10);
+    chrome.storage.local.set({ parallelChunks: val });
+    hudThreadsText.textContent = `${val} Threads Segmented`;
   });
+
   settingSorting.addEventListener("change", () => {
     chrome.storage.local.set({ smartSorting: settingSorting.checked });
   });
+
   settingAskFolder.addEventListener("change", () => {
     chrome.storage.local.set({ askFolder: settingAskFolder.checked });
   });
+
   settingFloatingBtn.addEventListener("change", () => {
     chrome.storage.local.set({ floatingButton: settingFloatingBtn.checked });
   });

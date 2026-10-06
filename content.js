@@ -1,14 +1,24 @@
-// PullDL In-Page Content Engine (v2.1 Turbo Edition)
-// Features: Platform Resolver (YouTube, Facebook, TikTok, Insta), Luxury Glassmorphic Pill, IDM HUD
+// PullDL In-Page Content Engine (v3.0.0 Universal Studio Edition)
+// 7-Layer Detection Engine: DOM (L1), Page Runtime Bridge (L2), Resource Timing (L3), Confidence Scoring (L6)
 
 (function () {
-  if (window.__pulldl_engine_v2_injected) return;
-  window.__pulldl_engine_v2_injected = true;
+  if (window.__pulldl_universal_injected) return;
+  window.__pulldl_universal_injected = true;
 
+  // 1. Inject Layer 2 Safe Page-Context Runtime Bridge
+  try {
+    const bridgeScript = document.createElement("script");
+    bridgeScript.src = chrome.runtime.getURL("page_bridge.js");
+    bridgeScript.async = false;
+    (document.head || document.documentElement).appendChild(bridgeScript);
+    bridgeScript.onload = () => bridgeScript.remove();
+  } catch (e) {}
+
+  const detectedCandidates = new Map(); // url -> candidate info
   const processedVideos = new WeakSet();
 
   function formatBytes(bytes) {
-    if (!bytes || bytes === 0) return "Unknown";
+    if (!bytes || bytes === 0) return "Direct Stream";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -61,7 +71,85 @@
     return "Web Media";
   }
 
-  // 1. Scan and Attach Luxury Corner Button
+  // 2. Layer 6: Confidence Scoring & Candidate Ranking
+  function calculateConfidence(candidate) {
+    let score = 0.5;
+    const url = (candidate.url || "").toLowerCase();
+
+    if (url.includes(".m3u8") || url.includes(".mpd")) score += 0.45;
+    if (url.includes(".mp4") || url.includes(".webm")) score += 0.4;
+    if (candidate.width && candidate.width >= 720) score += 0.2;
+    if (candidate.duration && candidate.duration > 15) score += 0.15;
+
+    // Filter out ads / trackers
+    if (url.includes("analytics") || url.includes("doubleclick") || url.includes("telemetry") || url.includes("beacon")) {
+      score = 0.05;
+    }
+    return Math.min(1.0, score);
+  }
+
+  function addCandidate(candidate) {
+    if (!candidate.url || candidate.url.startsWith("blob:") || candidate.url.startsWith("data:")) return;
+
+    const confidence = calculateConfidence(candidate);
+    if (confidence < 0.6) return; // Drop low-confidence noise
+
+    candidate.confidence = confidence;
+    detectedCandidates.set(candidate.url, candidate);
+
+    // Notify background
+    chrome.runtime.sendMessage({
+      type: "DOM_MEDIA_FOUND",
+      media: {
+        url: candidate.url,
+        mimeType: candidate.mimeType || "video/mp4",
+        format: candidate.format || "MP4",
+        size: candidate.size || 0,
+        confidence: confidence
+      }
+    }).catch(() => {});
+  }
+
+  // 3. Layer 2: Listen for Page Runtime Bridge Messages
+  window.addEventListener("message", (event) => {
+    if (event.data?.source !== "PULLDL_PAGE_BRIDGE") return;
+
+    const { type, data } = event.data;
+    if (type === "MEDIA_PLAYING") {
+      addCandidate({
+        url: data.src,
+        width: data.width,
+        height: data.height,
+        duration: data.duration,
+        format: data.src.includes(".m3u8") ? "HLS" : "MP4"
+      });
+    } else if (type === "NETWORK_FETCH" || type === "NETWORK_XHR") {
+      addCandidate({
+        url: data.url,
+        format: data.url.includes(".m3u8") ? "HLS" : data.url.includes(".mpd") ? "DASH" : "Stream"
+      });
+    }
+  });
+
+  // 4. Layer 3: Resource Performance Sniffer
+  function scanPerformanceResources() {
+    try {
+      const resources = window.performance.getEntriesByType("resource");
+      const streamRegex = /\.(m3u8|mpd|mp4|webm|m4s)(\?.*)?$/i;
+      resources.forEach((entry) => {
+        if (streamRegex.test(entry.name) || entry.name.includes("manifest") || entry.name.includes("videoplayback")) {
+          addCandidate({
+            url: entry.name,
+            size: entry.transferSize || entry.decodedBodySize || 0,
+            format: entry.name.includes(".m3u8") ? "HLS" : entry.name.includes(".mpd") ? "DASH" : "MP4"
+          });
+        }
+      });
+    } catch (e) {}
+  }
+  setInterval(scanPerformanceResources, 3500);
+
+  // 5. Layer 1: DOM Media Detection & SPA Route Listening
   function scanAndAttachVideoButtons() {
     const videos = document.querySelectorAll("video");
     videos.forEach((video) => {
@@ -70,6 +158,18 @@
 
       processedVideos.add(video);
       attachLuxuryCornerButton(video);
+
+      // Register DOM src
+      const src = video.currentSrc || video.src;
+      if (src && !src.startsWith("blob:")) {
+        addCandidate({
+          url: src,
+          width: video.videoWidth,
+          height: video.videoHeight,
+          duration: video.duration,
+          format: "MP4"
+        });
+      }
     });
   }
 
@@ -77,7 +177,6 @@
     let parent = video.parentElement;
     if (!parent) return;
 
-    // For YouTube player specifically: attach to movie_player or html5-video-player
     const ytContainer = document.querySelector("#movie_player, .html5-video-player");
     if (ytContainer && ytContainer.contains(video)) {
       parent = ytContainer;
@@ -88,11 +187,34 @@
       parent.classList.add("pulldl-video-anchor");
     }
 
-    // Avoid duplicate containers
     if (parent.querySelector(".pulldl-corner-btn-container")) return;
 
     const container = document.createElement("div");
     container.className = "pulldl-corner-btn-container";
+
+    // Draggable mechanics so it never obstructs subtitles
+    let isDragging = false, startX, startY, origLeft, origTop;
+    container.addEventListener("mousedown", (e) => {
+      if (e.target.closest(".pulldl-format-dropdown")) return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = container.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      origLeft = rect.left - parentRect.left;
+      origTop = rect.top - parentRect.top;
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      container.style.right = "auto";
+      container.style.left = `${Math.max(0, origLeft + dx)}px`;
+      container.style.top = `${Math.max(0, origTop + dy)}px`;
+    });
+
+    document.addEventListener("mouseup", () => { isDragging = false; });
 
     const btn = document.createElement("button");
     btn.className = "pulldl-corner-btn";
@@ -118,7 +240,7 @@
       dropdown.innerHTML = `
         <div class="pulldl-dropdown-header">
           <div class="pulldl-dropdown-header-top">
-            <span class="pulldl-dropdown-title">Stream Engine</span>
+            <span class="pulldl-dropdown-title">Universal Engine</span>
             <span class="pulldl-platform-pill">${platformName}</span>
           </div>
         </div>
@@ -129,7 +251,6 @@
       `;
 
       if (isPlatformSite() || (!video.src && !video.currentSrc) || (video.currentSrc && video.currentSrc.startsWith("blob:"))) {
-        // Query PullDL API for YouTube, Facebook, TikTok, etc.
         if (!cachedFormats && !isFetching) {
           isFetching = true;
           try {
@@ -164,7 +285,6 @@
       const title = data.title || getCleanPageTitle();
       const formats = data.formats || [];
 
-      // Deduplicate and sort highest quality first
       const uniqueFmts = [];
       const seenQualities = new Set();
       for (const f of formats) {
@@ -192,7 +312,7 @@
       });
 
       itemsHtml += `
-        <button class="pulldl-format-item" id="pulldl-opt-saveas" data-url="${uniqueFmts[0]?.url}" data-title="${title}" data-ext="${uniqueFmts[0]?.ext || "mp4"}" data-saveas="true">
+        <button class="pulldl-format-item" data-url="${uniqueFmts[0]?.url}" data-title="${title}" data-ext="${uniqueFmts[0]?.ext || "mp4"}" data-saveas="true">
           <span>⚙️ Custom Folder (Save As...)</span>
           <span class="pulldl-format-tag tag-custom">PICK</span>
         </button>
@@ -201,7 +321,7 @@
       dropdown.innerHTML = `
         <div class="pulldl-dropdown-header">
           <div class="pulldl-dropdown-header-top">
-            <span class="pulldl-dropdown-title">Stream Engine</span>
+            <span class="pulldl-dropdown-title">Universal Engine</span>
             <span class="pulldl-platform-pill">${platformName}</span>
           </div>
         </div>
@@ -212,7 +332,6 @@
     }
 
     function renderDirectFormats() {
-      const vWidth = video.videoWidth || 1920;
       const vHeight = video.videoHeight || 1080;
       const hasHd = vHeight >= 720;
       const hasFullHd = vHeight >= 1080;
@@ -298,7 +417,6 @@
               saveAs
             });
           } else {
-            // Fallback for blob
             window.open(`https://pulldl.com/?url=${encodeURIComponent(window.location.href)}`, "_blank");
           }
         });
@@ -325,7 +443,7 @@
     parent.appendChild(container);
   }
 
-  // 2. Executive Glassmorphic IDM-Style Telemetry HUD
+  // 6. Executive Telemetry HUD Modal
   function createOrUpdateDownloadHud(data) {
     let hud = document.getElementById("pulldl-active-hud");
 
@@ -431,9 +549,64 @@
     }
   }
 
-  // 3. Listen for Messages
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message.type === "DOWNLOAD_STARTED") {
+  // 7. Page Link Scraper for LinkGrabber
+  function scrapeAllPageLinks() {
+    const links = [];
+    const seen = new Set();
+
+    function addUrl(rawUrl, textHint = "", defaultCategory = "file") {
+      if (!rawUrl || typeof rawUrl !== "string") return;
+      try {
+        const parsed = new URL(rawUrl, window.location.href);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return;
+        const fullUrl = parsed.href;
+        if (seen.has(fullUrl)) return;
+        seen.add(fullUrl);
+
+        let category = defaultCategory;
+        const path = parsed.pathname.toLowerCase();
+        if (/\.(mp4|webm|mkv|mov|flv|m4v|avi|ts|m3u8|mpd)$/i.test(path)) category = "video";
+        else if (/\.(mp3|wav|flac|aac|m4a|ogg|opus)$/i.test(path)) category = "audio";
+        else if (/\.(jpg|jpeg|png|webp|gif|svg|avif)$/i.test(path)) category = "image";
+        else if (/\.(zip|rar|7z|tar|gz|bz2|iso|exe|msi|dmg|apk)$/i.test(path)) category = "archive";
+        else if (/youtube\.com|youtu\.be|facebook\.com|tiktok\.com|instagram\.com|vimeo\.com/i.test(parsed.hostname)) category = "video";
+
+        links.push({
+          url: fullUrl,
+          title: (textHint || parsed.pathname.split("/").pop() || fullUrl).trim().substring(0, 90),
+          category: category,
+          domain: parsed.hostname
+        });
+      } catch (e) {}
+    }
+
+    // Sniff DOM video/audio/sources
+    document.querySelectorAll("video, audio, source").forEach((el) => {
+      const src = el.src || el.getAttribute("src");
+      if (src) addUrl(src, el.title || document.title, el.tagName === "AUDIO" ? "audio" : "video");
+    });
+
+    // Sniff <a> tags
+    document.querySelectorAll("a[href]").forEach((a) => {
+      const href = a.getAttribute("href");
+      addUrl(href, a.innerText || a.getAttribute("title") || a.getAttribute("aria-label") || "");
+    });
+
+    // Sniff detected candidate streams
+    for (const [url, cand] of detectedCandidates.entries()) {
+      addUrl(url, getCleanPageTitle(), cand.format === "MP3" ? "audio" : "video");
+    }
+
+    return links;
+  }
+
+  // 8. Telemetry & Action Messages
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "SCRAPE_PAGE_LINKS" || message.type === "TRIGGER_PAGE_LINKGRAB") {
+      const links = scrapeAllPageLinks();
+      sendResponse({ success: true, links: links });
+      return true;
+    } else if (message.type === "DOWNLOAD_STARTED") {
       createOrUpdateDownloadHud({
         downloadId: message.downloadId,
         title: message.title,
@@ -449,9 +622,13 @@
     }
   });
 
-  // 4. Observer for dynamic videos
+  // 8. MutationObserver & SPA Navigation Support
   const observer = new MutationObserver(() => scanAndAttachVideoButtons());
   observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  // Listen to SPA route transitions (YouTube, TikTok, Facebook)
+  window.addEventListener("popstate", () => setTimeout(scanAndAttachVideoButtons, 600));
+  window.addEventListener("yt-navigate-finish", () => setTimeout(scanAndAttachVideoButtons, 600));
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", scanAndAttachVideoButtons);

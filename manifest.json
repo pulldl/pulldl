@@ -1,21 +1,22 @@
 {
   "manifest_version": 3,
-  "name": "PullDL — Universal Media Downloader & Turbo Manager",
-  "version": "2.1.0",
-  "description": "Auto-detects videos on any website. IDM-style corner download button, multi-threaded turbo speeds, and smart folder organization.",
+  "name": "PullDL — Universal Media Sniffer & Turbo Manager",
+  "version": "3.0.0",
+  "description": "7-Layer Universal Media Sniffer, Adaptive Multi-Thread Turbo Downloader, and JDownloader-style Batch LinkGrabber for all websites.",
   "permissions": [
     "storage",
     "downloads",
     "activeTab",
     "webRequest",
-    "contextMenus"
+    "contextMenus",
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "PullDL Turbo Manager",
+    "default_title": "PullDL Universal Studio",
     "default_icon": {
       "16": "assets/icon-16.png",
       "48": "assets/icon-48.png",
@@ -35,13 +36,16 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "css": ["content.css"],
-      "run_at": "document_idle",
+      "run_at": "document_start",
       "all_frames": true
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["assets/*"],
+      "resources": [
+        "page_bridge.js",
+        "assets/*"
+      ],
       "matches": ["<all_urls>"]
     }
   ]
