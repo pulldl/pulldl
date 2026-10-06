@@ -18,6 +18,14 @@
   "host_permissions": [
     "<all_urls>"
   ],
+  "externally_connectable": {
+    "matches": [
+      "https://pulldl.com/*",
+      "https://*.pulldl.com/*",
+      "http://localhost/*",
+      "http://localhost:*/*"
+    ]
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "PullDL Universal Studio",

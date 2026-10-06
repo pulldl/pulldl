@@ -679,4 +679,27 @@
   } else {
     scanAndAttachVideoButtons();
   }
+
+  // 9. Two-Way Handshake with PullDL Website
+  if (window.location.hostname.includes("pulldl.com") || window.location.hostname === "localhost") {
+    try {
+      document.documentElement.setAttribute("data-pulldl-extension-installed", "true");
+      document.documentElement.setAttribute("data-pulldl-extension-version", "3.0.0");
+      window.dispatchEvent(new CustomEvent("PULLDL_EXTENSION_ACTIVE", { detail: { version: "3.0.0" } }));
+      window.postMessage({ source: "PULLDL_EXTENSION", type: "EXTENSION_READY", version: "3.0.0" }, "*");
+    } catch (e) {}
+
+    // Listen for Web Studio download triggers
+    window.addEventListener("message", (event) => {
+      if (event.data?.source === "PULLDL_WEB" && event.data?.type === "WEB_DOWNLOAD_TRIGGER") {
+        chrome.runtime.sendMessage({
+          type: "TRIGGER_DOWNLOAD",
+          url: event.data.url,
+          title: event.data.title,
+          ext: event.data.ext || "mp4",
+          category: event.data.category || "video"
+        });
+      }
+    });
+  }
 })();

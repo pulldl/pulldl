@@ -533,3 +533,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
   }
 });
+
+// 8. Direct Two-Way Handshake with pulldl.com Website
+if (chrome.runtime.onMessageExternal) {
+  chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    if (message.type === "PING_EXTENSION" || message.type === "CHECK_STATUS") {
+      sendResponse({
+        success: true,
+        installed: true,
+        version: "3.0.0",
+        name: "PullDL Universal Studio"
+      });
+      return true;
+    }
+
+    if (message.type === "TRIGGER_TURBO_DOWNLOAD") {
+      initiateDownload({
+        url: message.url,
+        title: message.title,
+        category: message.category || "video",
+        ext: message.ext || "mp4"
+      }).then((downloadId) => {
+        sendResponse({ success: true, downloadId });
+      }).catch((err) => {
+        sendResponse({ success: false, error: err.message });
+      });
+      return true;
+    }
+  });
+}
