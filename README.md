@@ -5,7 +5,7 @@
 
   <p>
     <a href="https://pulldl.com"><img src="https://img.shields.io/badge/Official_Website-pulldl.com-0284c7?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website" /></a>
-    <a href="https://github.com/pulldl/pulldl/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-emerald?style=for-the-badge" alt="License" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Source--Available_(Protected)-red?style=for-the-badge" alt="License" /></a>
     <img src="https://img.shields.io/badge/Speed_Engine-Multi--Thread_Turbo-00C853?style=for-the-badge" alt="Turbo Engine" />
     <img src="https://img.shields.io/badge/Supported_Sites-1%2C290%2B-blueviolet?style=for-the-badge" alt="Supported Platforms" />
   </p>
@@ -14,7 +14,8 @@
     <a href="https://pulldl.com"><strong>Explore Web Studio</strong></a> •
     <a href="#-quick-install"><strong>Install Extension</strong></a> •
     <a href="#-features"><strong>Features</strong></a> •
-    <a href="#-supported-platforms"><strong>Supported Sites</strong></a>
+    <a href="#-supported-platforms"><strong>Supported Sites</strong></a> •
+    <a href="#-legal--anti-cloning-notice"><strong>Legal Notice</strong></a>
   </p>
 </div>
 
@@ -53,7 +54,7 @@ Install and test the extension directly in your Chromium-based browser in 30 sec
    ```bash
    git clone https://github.com/pulldl/pulldl.git
    ```
-   *(Or download and extract `pulldl-extension-v2.0.0.zip`)*
+   *(Or download and extract `pulldl-extension-v2.0.0.zip` from Releases)*
 2. **Open Extensions Manager:**
    - Chrome / Brave: Navigate to `chrome://extensions`
    - Microsoft Edge: Navigate to `edge://extensions`
@@ -83,6 +84,18 @@ Install and test the extension directly in your Chromium-based browser in 30 sec
 
 ---
 
-## 📄 License
+## ⚖️ Legal & Anti-Cloning Notice
 
-Distributed under the [MIT License](LICENSE). Built with ❤️ by the PullDL Community.
+- **Intellectual Property:** PullDL™, the PullDL logo, brand identity, user interface designs, and web platform are the exclusive intellectual property of **Mahean Ahmed**.
+- **No Commercial Redistribution:** Sublicensing, commercial monetization, or re-uploading this extension to the Chrome Web Store, Microsoft Edge Add-ons, Firefox AMO, or any extension marketplace without prior written consent is strictly prohibited.
+- **DMCA Protected:** Unauthorized commercial clones, trademark counterfeits, or stolen design templates will be subject to immediate DMCA takedown requests.
+
+---
+
+## 📄 License & Policies
+
+- 📜 [Source-Available License](LICENSE)
+- ⚖️ [Trademark & Brand Guidelines](TRADEMARK.md)
+- 🛡️ [Security & Vulnerability Reporting](SECURITY.md)
+
+Copyright © 2026 Mahean Ahmed / PullDL. All Rights Reserved.
