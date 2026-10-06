@@ -9,8 +9,12 @@
     "activeTab",
     "webRequest",
     "contextMenus",
-    "tabs"
+    "tabs",
+    "sidePanel"
   ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "host_permissions": [
     "<all_urls>"
   ],

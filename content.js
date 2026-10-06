@@ -216,16 +216,18 @@
 
     document.addEventListener("mouseup", () => { isDragging = false; });
 
-    const btn = document.createElement("button");
-    btn.className = "pulldl-corner-btn";
-    btn.innerHTML = `
-      <span class="pulldl-radar-dot"></span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-        <polyline points="7 10 12 15 17 10"></polyline>
-        <line x1="12" y1="15" x2="12" y2="3"></line>
-      </svg>
-      <span>PullDL</span>
+    const pill = document.createElement("div");
+    pill.className = "pulldl-smart-pill";
+    pill.innerHTML = `
+      <div class="pulldl-pill-meta">
+        <span class="pulldl-pill-glyph">↓</span>
+        <span class="pulldl-pill-title">1080p detected</span>
+      </div>
+      <div class="pulldl-pill-buttons">
+        <button class="pulldl-pill-btn-dl" title="Quick Download">Download</button>
+        <button class="pulldl-pill-btn-more" title="More formats">▾</button>
+        <button class="pulldl-pill-btn-dismiss" title="Dismiss">✕</button>
+      </div>
     `;
 
     const dropdown = document.createElement("div");
@@ -423,7 +425,42 @@
       });
     }
 
-    btn.addEventListener("click", (e) => {
+    // Smart Download primary button
+    pill.querySelector(".pulldl-pill-btn-dl")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const directUrl = video.currentSrc || video.src;
+      const title = getCleanPageTitle();
+
+      if (isPlatformSite() || (!directUrl || directUrl.startsWith("blob:"))) {
+        chrome.runtime.sendMessage({
+          type: "RESOLVE_PLATFORM_FORMATS",
+          pageUrl: window.location.href
+        }, (resp) => {
+          if (resp?.success && resp.data?.formats?.length > 0) {
+            const best = resp.data.formats[0];
+            chrome.runtime.sendMessage({
+              type: "TRIGGER_DOWNLOAD",
+              url: best.url,
+              title: resp.data.title || title,
+              ext: best.ext || "mp4",
+              category: "video"
+            });
+          }
+        });
+      } else {
+        chrome.runtime.sendMessage({
+          type: "TRIGGER_DOWNLOAD",
+          url: directUrl,
+          title: title,
+          ext: "mp4",
+          category: "video"
+        });
+      }
+    });
+
+    // More formats dropdown toggle
+    pill.querySelector(".pulldl-pill-btn-more")?.addEventListener("click", (e) => {
       e.stopPropagation();
       e.preventDefault();
       dropdown.classList.toggle("show");
@@ -432,13 +469,20 @@
       }
     });
 
+    // Dismiss pill
+    pill.querySelector(".pulldl-pill-btn-dismiss")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      container.remove();
+    });
+
     document.addEventListener("click", (e) => {
       if (!container.contains(e.target)) {
         dropdown.classList.remove("show");
       }
     });
 
-    container.appendChild(btn);
+    container.appendChild(pill);
     container.appendChild(dropdown);
     parent.appendChild(container);
   }

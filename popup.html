@@ -3,294 +3,78 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PullDL Universal Studio</title>
+  <title>PullDL Quick Launcher</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="pulldl-popup-container">
-    <!-- 1. Executive Top Bar -->
-    <header class="pulldl-header">
+  <div class="popup-wrapper">
+    <!-- Header -->
+    <header class="popup-header">
       <div class="brand">
-        <img src="assets/logo.png" alt="PullDL" class="logo">
-        <div class="brand-text">
-          <div class="brand-row">
-            <span class="brand-name">PullDL</span>
-            <span class="badge-studio">STUDIO v3.0</span>
-          </div>
-          <span class="brand-subtitle">Universal Multi-Engine Downloader</span>
-        </div>
+        <span class="brand-symbol">◈</span>
+        <span class="brand-text">PullDL</span>
       </div>
-      <div class="header-actions">
-        <a href="https://pulldl.com" target="_blank" class="web-link" title="Open Web Studio">
-          <span>Web Studio</span>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-        </a>
-      </div>
+      <button id="btn-popup-settings" class="icon-btn" title="Settings" aria-label="Settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
     </header>
 
-    <!-- 2. 5-Tab Navigation -->
-    <nav class="pulldl-nav">
-      <button class="nav-tab active" data-tab="tab-detected" title="Detected Media Streams">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
-        <span>Streams</span>
-        <span class="tab-badge" id="badge-detected-count">0</span>
-      </button>
-
-      <button class="nav-tab" data-tab="tab-linkgrabber" title="JDownloader Batch LinkGrabber">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-        <span>LinkGrabber</span>
-        <span class="tab-badge" id="badge-grabber-count" style="display: none;">0</span>
-      </button>
-
-      <button class="nav-tab" data-tab="tab-active" title="Active Multi-Thread Tasks">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-        <span>Active</span>
-        <span class="tab-badge pulse" id="badge-active-count" style="display: none;">0</span>
-      </button>
-
-      <button class="nav-tab" data-tab="tab-history" title="Download History">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-        <span>History</span>
-      </button>
-
-      <button class="nav-tab" data-tab="tab-settings" title="Engine Settings">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-        <span>Config</span>
-      </button>
-    </nav>
-
-    <!-- 3. Tab Contents -->
-    <main class="pulldl-content">
-
-      <!-- ================= TAB 1: DETECTED STREAMS ================= -->
-      <section id="tab-detected" class="tab-pane active">
-        <!-- Site Header Info -->
-        <div class="tab-header-card" id="detected-header-card">
-          <div class="active-page-info">
-            <span class="active-dot"></span>
-            <span class="active-page-title" id="active-tab-title">Inspecting Page...</span>
-          </div>
-          <button class="btn-refresh-streams" id="btn-refresh-streams" title="Refresh Streams">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-          </button>
-        </div>
-
-        <!-- Filter & Batch Action Row -->
-        <div class="detected-action-row" id="detected-action-bar" style="display: none;">
-          <input type="text" id="detected-search" class="compact-search-input" placeholder="Filter format (e.g. 1080p, mp3)...">
-          <button id="btn-download-all-detected" class="btn-primary-batch">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-            <span>Batch Download</span>
-          </button>
-        </div>
-
-        <!-- Stream Cards List -->
-        <div id="detected-list" class="media-list">
-          <!-- Populated by popup.js -->
-        </div>
-
-        <!-- Empty Radar State -->
-        <div id="detected-empty" class="empty-state">
-          <div class="radar-scan">
-            <div class="radar-circle"></div>
-            <div class="radar-beam"></div>
-          </div>
-          <h3 id="empty-state-title">Sniffing Media Streams...</h3>
-          <p id="empty-state-desc">Play any video or audio on the page. The 7-layer engine will capture 4K/1080p and HLS streams automatically.</p>
-        </div>
-      </section>
-
-      <!-- ================= TAB 2: LINKGRABBER (JDownloader Style) ================= -->
-      <section id="tab-linkgrabber" class="tab-pane">
-        <!-- Quick Action Buttons -->
-        <div class="grabber-top-actions">
-          <button id="btn-scrape-page" class="btn-action-pill">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-            <span>Scrape Current Page</span>
-          </button>
-          <button id="btn-paste-clipboard" class="btn-action-pill">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-            <span>Paste Clipboard</span>
-          </button>
-        </div>
-
-        <!-- Collapsible Raw URL Input Box -->
-        <div class="grabber-input-box">
-          <textarea id="grabber-input" class="grabber-textarea" rows="2" placeholder="Paste URLs, playlists, or raw text with links..."></textarea>
-          <button id="btn-parse-links" class="btn-parse">Parse</button>
-        </div>
-
-        <!-- Filter Chips by Category -->
-        <div class="grabber-chips-bar" id="grabber-chips-bar" style="display: none;">
-          <button class="filter-chip active" data-category="all">All (<span id="chip-count-all">0</span>)</button>
-          <button class="filter-chip" data-category="video">Video (<span id="chip-count-video">0</span>)</button>
-          <button class="filter-chip" data-category="audio">Audio (<span id="chip-count-audio">0</span>)</button>
-          <button class="filter-chip" data-category="image">Images (<span id="chip-count-image">0</span>)</button>
-          <button class="filter-chip" data-category="archive">Files (<span id="chip-count-archive">0</span>)</button>
-        </div>
-
-        <!-- Selection Controls Row -->
-        <div class="grabber-select-row" id="grabber-select-row" style="display: none;">
-          <label class="grabber-checkbox-label">
-            <input type="checkbox" id="grabber-toggle-all" checked>
-            <span>Select All</span>
-          </label>
-          <span class="grabber-selection-status" id="grabber-selection-count">0 of 0 selected</span>
-        </div>
-
-        <!-- Links List -->
-        <div id="grabber-list" class="grabber-list"></div>
-
-        <!-- Empty State -->
-        <div id="grabber-empty" class="empty-state">
-          <div class="icon-bubble">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-          </div>
-          <h3>LinkGrabber Matrix Ready</h3>
-          <p>Scrape all downloadable links from the page or paste bulk URLs to batch download in parallel.</p>
-        </div>
-
-        <!-- Sticky Bottom Batch Action -->
-        <div class="grabber-footer-action" id="grabber-footer-action" style="display: none;">
-          <button id="btn-download-selected-grab" class="btn-primary-large">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-            <span id="btn-download-selected-text">⚡ Start Batch Download (0 items)</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- ================= TAB 3: ACTIVE TASKS & TELEMETRY HUD ================= -->
-      <section id="tab-active" class="tab-pane">
-        <!-- Global Speedometer Overview Card -->
-        <div class="speedo-overview-card" id="speedo-overview" style="display: none;">
-          <div class="speedo-stats">
-            <div class="speedo-main">
-              <span class="speedo-number" id="hud-total-speed">0.0</span>
-              <span class="speedo-unit" id="hud-total-unit">MB/s</span>
-            </div>
-            <div class="speedo-threads-badge">
-              <span class="dot-green"></span>
-              <span id="hud-threads-text">8 Threads Segmented</span>
-            </div>
-          </div>
-          <div class="packet-wave">
-            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
-            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
-          </div>
-        </div>
-
-        <!-- Active Tasks List -->
-        <div id="active-list" class="downloads-list"></div>
-
-        <!-- Empty State -->
-        <div id="active-empty" class="empty-state">
-          <div class="icon-bubble">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
-          </div>
-          <h3>No Active Downloads</h3>
-          <p>Any media or batch task running will display live segment throughput and progress here.</p>
-        </div>
-      </section>
-
-      <!-- ================= TAB 4: HISTORY ================= -->
-      <section id="tab-history" class="tab-pane">
-        <div class="history-top-bar" id="history-top-bar" style="display: none;">
-          <span class="history-count-text" id="history-count-label">Completed Files</span>
-          <button id="btn-clear-history" class="btn-text-danger">Clear</button>
-        </div>
-
-        <div id="history-list" class="history-list"></div>
-
-        <div id="history-empty" class="empty-state">
-          <div class="icon-bubble">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          </div>
-          <h3>No History Yet</h3>
-          <p>Your finished downloads will be cataloged here with one-click folder reveal.</p>
-        </div>
-      </section>
-
-      <!-- ================= TAB 5: SETTINGS ================= -->
-      <section id="tab-settings" class="tab-pane">
-        <div class="settings-group">
-          <div class="setting-item">
-            <div class="setting-text">
-              <label>Parallel Chunk Segmentation</label>
-              <span>Multi-connection acceleration engine (IDM-grade)</span>
-            </div>
-            <select id="setting-threads" class="setting-select">
-              <option value="4">4 Threads (Standard)</option>
-              <option value="8" selected>8 Threads (Turbo — Recommended)</option>
-              <option value="16">16 Threads (Extreme Gig-E)</option>
-            </select>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-text">
-              <label>Smart Folder Sorting</label>
-              <span>Auto-route to PullDL/Videos, Music, & Archives</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setting-sorting" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-text">
-              <label>Always Prompt Save Location</label>
-              <span>Show folder picker before each download starts</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setting-ask-folder">
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-text">
-              <label>In-Page Floating Corner Button</label>
-              <span>Draggable turbo download icon attached to videos</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="setting-floating-btn" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Engine System Info Badge -->
-        <div class="engine-info-box">
-          <div class="info-row">
-            <span>Core Protocol Engine:</span>
-            <strong class="highlight-cyan">v3.0.0 Universal Studio</strong>
-          </div>
-          <div class="info-row">
-            <span>Detection Layers:</span>
-            <strong>7 Independent Layers (L1-L7)</strong>
-          </div>
-          <div class="info-row">
-            <span>Platform Support:</span>
-            <strong>YouTube, FB, TikTok, IG, X, 1,290+ Sites</strong>
-          </div>
-          <div class="info-row">
-            <span>Companion Cloud:</span>
-            <a href="https://pulldl.com" target="_blank" class="highlight-green">https://pulldl.com ↗</a>
-          </div>
-        </div>
-      </section>
-
-    </main>
-
-    <!-- 4. Global Footer -->
-    <footer class="pulldl-footer">
-      <div class="footer-status">
-        <span class="dot-online"></span>
-        <span id="footer-engine-status">Engine Online • High-Speed Stream Ready</span>
+    <!-- Current Tab Status Card -->
+    <div class="site-card">
+      <div class="site-info">
+        <span class="site-icon">🌐</span>
+        <span class="site-domain" id="site-domain-label">Scanning page...</span>
       </div>
+      <div class="site-status">
+        <span class="status-dot" id="site-status-dot"></span>
+        <span class="status-text" id="site-status-text">Detecting media</span>
+      </div>
+    </div>
+
+    <!-- Flagship Primary Action -->
+    <div class="primary-actions">
+      <button id="btn-open-sidepanel" class="btn-primary-command">
+        <span class="btn-symbol">◈</span>
+        <span>Open Download Center</span>
+        <span class="btn-shortcut">Side Panel</span>
+      </button>
+
+      <div class="action-grid">
+        <button id="btn-download-best" class="btn-secondary" title="Download highest quality detected stream">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span id="label-download-best">Download Best</span>
+        </button>
+        <button id="btn-detect-media" class="btn-secondary" title="Re-scan current tab for media">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          <span>Detect Media</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick URL Input -->
+    <div class="quick-input-group">
+      <input type="text" id="quick-url-input" placeholder="Paste URL to analyze..." class="quick-input" autocomplete="off" spellcheck="false">
+      <button id="btn-analyze-url" class="btn-analyze">Analyze</button>
+    </div>
+
+    <!-- Recent Items Snippet -->
+    <div class="recent-section">
+      <div class="section-title">Recent Activity</div>
+      <div id="recent-list" class="recent-list">
+        <div class="recent-empty">No downloads yet. Active tasks appear here.</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="popup-footer">
       <div class="footer-links">
-        <span class="footer-ver">PullDL Engine</span>
+        <button class="footer-link" id="link-open-history">History</button>
+        <span class="separator">•</span>
+        <button class="footer-link" id="link-open-settings">Settings</button>
+        <span class="separator">•</span>
+        <a href="https://pulldl.com" target="_blank" class="footer-link">Web Studio ↗</a>
       </div>
+      <span class="shortcut-hint">⌘K Command Palette</span>
     </footer>
   </div>
 

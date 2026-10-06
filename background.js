@@ -1,39 +1,67 @@
 // PullDL Background Service Worker (Universal Studio Engine v3.0.0)
-// Implements: 7-Layer Media Registry, Adaptive Segmentation, JDownloader Batch LinkGrabber, Smart Folder Routing
+// Implements: 7-Layer Media Registry, Side Panel Controller, Queue Management, JDownloader Batch LinkGrabber, Telemetry Engine
 
 const tabMediaMap = new Map(); // tabId -> Array of Media objects
 const activeDownloadsMap = new Map(); // downloadId -> Telemetry state
 const downloadHistory = []; // Recent completed downloads
+const downloadQueue = []; // Queued download tasks
+const speedSamples = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // 12-sample speed sparkline
 
 const DEFAULT_SETTINGS = {
   askFolder: false,
   smartSorting: true,
-  concurrencyMode: "adaptive", // adaptive, 4, 8, 16
+  concurrencyMode: "8", // 4, 8, 16
   floatingButton: true,
-  autoSniff: true
+  autoSniff: true,
+  uiMode: "simple", // simple or advanced
+  preferredQuality: "best",
+  preferredFormat: "mp4"
 };
 
-// Initialize settings & Context Menu
+// 1. Initialize settings, Side Panel & Context Menu
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(DEFAULT_SETTINGS, (stored) => {
     chrome.storage.local.set(stored);
   });
 
-  chrome.contextMenus.create({
-    id: "pulldl-download-turbo",
-    title: "⚡ Download with PullDL Turbo",
-    contexts: ["page", "link", "video", "audio"]
-  });
+  // Enable Side Panel API behavior
+  if (chrome.sidePanel?.setPanelBehavior) {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+  }
 
-  chrome.contextMenus.create({
-    id: "pulldl-grab-links",
-    title: "📋 Grab all links on page (PullDL LinkGrabber)",
-    contexts: ["page", "selection"]
+  // Organized Context Menus
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "pulldl-root",
+      title: "Download with PullDL",
+      contexts: ["page", "link", "video", "audio", "selection"]
+    });
+
+    chrome.contextMenus.create({
+      id: "pulldl-download-action",
+      parentId: "pulldl-root",
+      title: "⚡ Download media / link",
+      contexts: ["link", "video", "audio"]
+    });
+
+    chrome.contextMenus.create({
+      id: "pulldl-grab-page-links",
+      parentId: "pulldl-root",
+      title: "📋 Grab all page links",
+      contexts: ["page", "selection"]
+    });
+
+    chrome.contextMenus.create({
+      id: "pulldl-open-center",
+      parentId: "pulldl-root",
+      title: "◈ Open Download Center (Side Panel)",
+      contexts: ["page", "link", "video", "audio", "selection"]
+    });
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "pulldl-download-turbo") {
+  if (info.menuItemId === "pulldl-download-action") {
     const targetUrl = info.srcUrl || info.linkUrl || tab?.url;
     if (targetUrl && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
       initiateDownload({
@@ -43,8 +71,12 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         category: info.mediaType === "audio" ? "audio" : "video"
       });
     }
-  } else if (info.menuItemId === "pulldl-grab-links") {
+  } else if (info.menuItemId === "pulldl-grab-page-links") {
     chrome.tabs.sendMessage(tab.id, { type: "TRIGGER_PAGE_LINKGRAB" }).catch(() => {});
+  } else if (info.menuItemId === "pulldl-open-center") {
+    if (chrome.sidePanel?.open && tab?.windowId) {
+      chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+    }
   }
 });
 
@@ -61,7 +93,7 @@ function sanitizeFilename(name, fallbackExt = "mp4") {
   return clean;
 }
 
-// 1. API Stream Resolver (YouTube, Facebook, TikTok, Instagram, Twitter/X, Reddit)
+// 2. Layer 5: Cloud API Stream Resolver
 async function resolveMediaFormatsViaApi(pageUrl) {
   try {
     const response = await fetch("https://pulldl.com/api/extract", {
@@ -88,7 +120,7 @@ async function resolveMediaFormatsViaApi(pageUrl) {
   }
 }
 
-// 2. Layer 4: WebRequest Stream Sniffer
+// 3. Layer 4: WebRequest Stream Sniffer
 const MEDIA_MIME_TYPES = [
   "video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-matroska",
   "application/vnd.apple.mpegurl", "application/x-mpegurl", "application/dash+xml",
@@ -157,7 +189,7 @@ function registerDetectedMedia(tabId, mediaItem) {
   list.push(mediaItem);
 
   chrome.action.setBadgeText({ text: list.length.toString(), tabId });
-  chrome.action.setBadgeBackgroundColor({ color: "#00E676", tabId });
+  chrome.action.setBadgeBackgroundColor({ color: "#2563eb", tabId });
 
   chrome.tabs.sendMessage(tabId, {
     type: "MEDIA_SNIFFED",
@@ -168,7 +200,7 @@ function registerDetectedMedia(tabId, mediaItem) {
 
 chrome.tabs.onRemoved.addListener((tabId) => tabMediaMap.delete(tabId));
 
-// 3. Initiate High-Speed Download with Adaptive Segmentation
+// 4. Initiate High-Speed Download
 async function initiateDownload({ url, title, tabId, category = "video", ext = "mp4", saveAs = false }) {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
   const cleanFilename = sanitizeFilename(title, ext);
@@ -177,6 +209,8 @@ async function initiateDownload({ url, title, tabId, category = "video", ext = "
   if (settings.smartSorting) {
     if (category === "audio" || ext.toLowerCase() === "mp3") {
       targetPath = `PullDL/Music/${cleanFilename}`;
+    } else if (category === "archive") {
+      targetPath = `PullDL/Archives/${cleanFilename}`;
     } else {
       targetPath = `PullDL/Videos/${cleanFilename}`;
     }
@@ -199,6 +233,8 @@ async function initiateDownload({ url, title, tabId, category = "video", ext = "
       url,
       title: title || cleanFilename,
       filename: targetPath,
+      category,
+      ext,
       startTime: Date.now(),
       lastTime: Date.now(),
       lastBytes: 0,
@@ -232,7 +268,7 @@ async function initiateDownload({ url, title, tabId, category = "video", ext = "
   }
 }
 
-// 4. Real-time Telemetry
+// 5. Real-time Telemetry & Sparkline Sampling
 chrome.downloads.onChanged.addListener((delta) => {
   const item = activeDownloadsMap.get(delta.id);
   if (!item) return;
@@ -243,11 +279,19 @@ chrome.downloads.onChanged.addListener((delta) => {
     const received = delta.bytesReceived.current;
     const timeDiff = (now - item.lastTime) / 1000;
 
-    if (timeDiff >= 0.4) {
+    if (timeDiff >= 0.3) {
       const bytesDiff = received - item.lastBytes;
       item.speed = Math.max(0, Math.round(bytesDiff / timeDiff));
       item.lastBytes = received;
       item.lastTime = now;
+
+      // Update aggregate sparkline samples
+      let currentTotalSpeed = 0;
+      for (const d of activeDownloadsMap.values()) {
+        if (d.state === "in_progress" && d.speed) currentTotalSpeed += d.speed;
+      }
+      speedSamples.shift();
+      speedSamples.push(currentTotalSpeed);
     }
     item.receivedBytes = received;
   }
@@ -271,6 +315,9 @@ chrome.downloads.onChanged.addListener((delta) => {
         id: item.downloadId,
         title: item.title,
         filename: item.filename,
+        url: item.url,
+        category: item.category,
+        ext: item.ext,
         totalBytes: item.receivedBytes,
         completedAt: Date.now()
       });
@@ -299,7 +346,7 @@ chrome.downloads.onChanged.addListener((delta) => {
   }
 });
 
-// 5. Smart LinkGrabber (JDownloader Style Batch URL Extractor)
+// 6. LinkGrabber URL Parser
 function parseLinksFromText(rawText) {
   const urlRegex = /https?:\/\/[^\s"'<>()[\]{}]+/gi;
   const matches = rawText.match(urlRegex) || [];
@@ -322,11 +369,23 @@ function parseLinksFromText(rawText) {
   });
 }
 
-// 6. Message Dispatcher
+// 7. Message Dispatcher (Popup, Side Panel, Content Scripts)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender?.tab?.id || message.tabId;
 
   switch (message.type) {
+    case "OPEN_SIDE_PANEL": {
+      if (chrome.sidePanel?.open) {
+        const winId = sender?.tab?.windowId || message.windowId;
+        chrome.sidePanel.open({ windowId: winId })
+          .then(() => sendResponse({ success: true }))
+          .catch((err) => sendResponse({ success: false, error: err.message }));
+        return true;
+      }
+      sendResponse({ success: false, error: "Side Panel API not supported" });
+      break;
+    }
+
     case "GET_TAB_MEDIA": {
       const mediaList = tabMediaMap.get(tabId) || [];
       sendResponse({ media: mediaList });
@@ -375,7 +434,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             category: item.category || "video",
             ext: item.ext || "mp4"
           }).catch(() => {});
-        }, index * 400); // 400ms stagger
+        }, index * 350);
         dispatched++;
       });
       sendResponse({ success: true, count: dispatched });
@@ -403,6 +462,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
+    case "PAUSE_ALL_DOWNLOADS": {
+      activeDownloadsMap.forEach((item) => {
+        if (item.state === "in_progress") {
+          chrome.downloads.pause(item.downloadId);
+        }
+      });
+      sendResponse({ success: true });
+      break;
+    }
+
+    case "RESUME_ALL_DOWNLOADS": {
+      activeDownloadsMap.forEach((item) => {
+        if (item.state === "paused") {
+          chrome.downloads.resume(item.downloadId);
+        }
+      });
+      sendResponse({ success: true });
+      break;
+    }
+
+    case "CLEAR_HISTORY": {
+      downloadHistory.length = 0;
+      sendResponse({ success: true });
+      break;
+    }
+
     case "OPEN_DOWNLOAD": {
       chrome.downloads.open(message.downloadId);
       sendResponse({ success: true });
@@ -417,7 +502,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case "GET_ACTIVE_DOWNLOADS": {
       const activeList = Array.from(activeDownloadsMap.values());
-      sendResponse({ activeDownloads: activeList, history: downloadHistory });
+      sendResponse({
+        activeDownloads: activeList,
+        history: downloadHistory,
+        speedSamples: speedSamples,
+        queue: downloadQueue
+      });
+      break;
+    }
+
+    case "GET_QUEUE": {
+      sendResponse({ queue: downloadQueue });
+      break;
+    }
+
+    case "ADD_TO_QUEUE": {
+      if (message.item) {
+        downloadQueue.push({
+          id: "q_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+          ...message.item,
+          priority: message.priority || "NORMAL",
+          status: "QUEUED"
+        });
+      }
+      sendResponse({ success: true, queue: downloadQueue });
       break;
     }
 
